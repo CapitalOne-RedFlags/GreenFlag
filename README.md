@@ -27,7 +27,6 @@ project-root/
 │   ├── messaging/
 │   │   ├── sns.go  # SNS message publisher
 │   │   ├── sqs.go  # SQS consumer for event messages
-│   │   ├── event_bus.go  # Event handling abstraction
 │   ├── models/
 │   │   ├── transaction.go  # Transaction model
 │   │   ├── account.go  # Account model
@@ -37,7 +36,8 @@ project-root/
 │   │   ├── notification_service.go  # Handles SNS alerts
 │   ├── events/
 │   │   ├── event_types.go  # Defines different event types
-│   │   ├── event_dispatcher.go  # Central logic for publishing events
+│   │   ├── event_dispatcher.go  # Central logic for publishing events, uses event_bus
+|   |   ├── event_bus.go  # Utilized by event_dispatcher to invoke appropriate methods from internal/messaging
 │   │   ├── event_handlers.go  # Handlers for processing incoming events
 │   ├── handlers/
 │   │   ├── transaction_handler.go  # Handles Lambda triggers for transactions
@@ -64,6 +64,21 @@ project-root/
 ├── Makefile  # Build, test, deploy commands
 ```
 
+## Core Dependency Flow
+```bash
+handlers → services → events → messaging → db
+```
+| **Component**            | **Depends On**                   | **Purpose** | **Example** |
+|-------------------------|--------------------------------|-------------|------------|
+| `cmd/lambda/main.go`     | `handlers/`                     | Entry point for AWS Lambda. | The `main.go` file starts the Lambda function and calls `TransactionHandler` when an event is received. |
+| `handlers/`             | `services/`, `events/`          | Processes Lambda requests and routes them. | The `TransactionHandler` in `internal/handlers/transaction_handler.go` should receive an event from AWS Lambda (triggered by SQS or API Gateway), parse it, and pass it to `event_handlers.go` for processing. |
+| `services/`             | `events/`, `db/`, `messaging/`  | Business logic layer (transaction processing, fraud detection). | `ProcessTransaction` in `transaction_service.go` checks for fraud, stores the transaction in DynamoDB, and dispatches a `TransactionCreated` event. |
+| `events/`               | `messaging/`                    | Defines events, publishes them, and processes incoming events. | The `event_handlers.go` file routes a `TransactionCreated` event to `ProcessTransaction`, and `event_dispatcher.go` sends it to SNS or SQS via the `event_bus`. |
+| `messaging/`            | AWS SDK (`sns.go`, `sqs.go`)    | Handles actual AWS messaging logic. | `sns.go` publishes fraud alerts to an SNS topic, while `sqs.go` receives messages from the transaction queue. |
+| `db/`                   | AWS SDK (`dynamo.go`)           | Manages data persistence in DynamoDB. | `dynamo.go` saves new transactions in the `Transactions` table and retrieves them when needed. |
+
+## Program Flow
+![Green Flag Flow](docs/GreenFlag_Flow.png)
 ## **Getting Started**
 ### **Prerequisites**
 Ensure you have the following installed:
