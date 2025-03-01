@@ -1,4 +1,4 @@
-# Project Name: Event-Driven Serverless Architecture
+# GreenFlag Architecture Design
 
 ## Overview
 This repository contains a **serverless event-driven architecture** built using **AWS Lambda, Amazon SQS, Amazon SNS, and DynamoDB**. The system is designed to process transactions, detect fraud, and notify users via email/SMS.
@@ -79,6 +79,9 @@ handlers → services → events → messaging → db
 
 ## Program Flow
 ![Green Flag Flow](docs/GreenFlag_Flow.png)
+
+## High Level Diagram
+![Green Flag Services](docs/)
 ## **Getting Started**
 ### **Prerequisites**
 Ensure you have the following installed:
