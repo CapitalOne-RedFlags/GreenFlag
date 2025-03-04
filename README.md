@@ -81,7 +81,7 @@ handlers → services → events → messaging → db
 ![Green Flag Flow](docs/GreenFlag_Flow.png)
 
 ## High Level Diagram
-![Green Flag Services](docs/)
+![Green Flag Services](docs/GreenFlag_SystemDesign.png)
 ## **Getting Started**
 ### **Prerequisites**
 Ensure you have the following installed:
