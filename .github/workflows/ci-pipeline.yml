@@ -30,10 +30,11 @@ jobs:
         run: go test -v ./test -coverprofile=coverage.out
 
       - name: Upload Test Coverage Report # view coverage report at https://app.codecov.io/gh/CapitalOne-RedFlags/GreenFlag
+        if: ${{ success() }}
         uses: codecov/codecov-action@v3
         with:
           file: coverage.out
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   security-checks:
     runs-on: ubuntu-latest
@@ -50,5 +51,6 @@ jobs:
 
       - name: Run Security Scan
         run: trivy fs --exit-code 1 --severity CRITICAL,HIGH .
+      
   
 
