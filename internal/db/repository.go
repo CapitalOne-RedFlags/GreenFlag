@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -22,39 +23,38 @@ func NewTransactionRepository(db *DynamoDBClient) *TransactionRepository {
 
 // SaveTransaction validates and inserts a new transaction.
 func (r *TransactionRepository) SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error) {
-	// Validate the transaction before saving
 	if err := t.ValidateTransaction(); err != nil {
 		return nil, "", fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Marshal transaction into a DynamoDB-compatible format
 	item, err := t.MarshalDynamoDB()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to marshal transaction: %w", err)
 	}
 
-	// Insert transaction into DynamoDB
 	output, metadata, err := r.DB.PutItem(ctx, item)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Log metadata for monitoring purposes
 	fmt.Printf("Transaction saved: %s | Metadata: %s\n", t.TransactionID, metadata)
-
 	return output, metadata, nil
 }
 
-// GetTransaction retrieves a transaction by TransactionID.
-func (r *TransactionRepository) GetTransaction(ctx context.Context, transactionID string) (*models.Transaction, error) {
-	// Validate input
+// GetTransaction retrieves a transaction by AccountID and TransactionID
+func (r *TransactionRepository) GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error) {
+	// Validate input using config keys
+	if accountID == "" {
+		return nil, fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.PartitionKey)
+	}
 	if transactionID == "" {
-		return nil, errors.New("transactionID cannot be empty")
+		return nil, fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.SortKey)
 	}
 
-	// Define the key
+	// Define key using config
 	key := map[string]types.AttributeValue{
-		"TransactionID": &types.AttributeValueMemberS{Value: transactionID},
+		config.DBConfig.Keys.PartitionKey: &types.AttributeValueMemberS{Value: accountID},
+		config.DBConfig.Keys.SortKey:      &types.AttributeValueMemberS{Value: transactionID},
 	}
 
 	// Fetch transaction from DynamoDB
@@ -73,43 +73,56 @@ func (r *TransactionRepository) GetTransaction(ctx context.Context, transactionI
 }
 
 // UpdateTransaction updates a transaction's fields.
-func (r *TransactionRepository) UpdateTransaction(ctx context.Context, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error) {
-	// Validate transaction ID
-	if transactionID == "" {
-		return nil, errors.New("transactionID cannot be empty")
+func (r *TransactionRepository) UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error) {
+	// Validate input using config keys
+	if accountID == "" {
+		return nil, fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.PartitionKey)
 	}
+	if transactionID == "" {
+		return nil, fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.SortKey)
+	}
+
 	// Convert struct to a map for partial updates
 	updates, err := values.TransactionUpdatePayload()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert transaction to update map: %w", err)
 	}
+
 	// Ensure at least one field is provided for update
 	if len(updates) == 0 {
 		return nil, errors.New("no fields provided for update")
 	}
 
-	// Call DynamoDB update function
-	result, err := r.DB.UpdateItem(ctx, transactionID, updates)
+	// Define key using config
+	key := map[string]types.AttributeValue{
+		config.DBConfig.Keys.PartitionKey: &types.AttributeValueMemberS{Value: accountID},
+		config.DBConfig.Keys.SortKey:      &types.AttributeValueMemberS{Value: transactionID},
+	}
+
+	// Call DynamoDB update function with key
+	result, err := r.DB.UpdateItem(ctx, key, updates)
 	if err != nil {
 		return nil, err
 	}
 
-	// Log updated values
 	fmt.Printf("Transaction updated: %s | UpdatedFields: %v\n", transactionID, result.Attributes)
-
 	return result, nil
 }
 
-// DeleteTransaction removes a transaction by TransactionID.
-func (r *TransactionRepository) DeleteTransaction(ctx context.Context, transactionID string) error {
-	// Validate input
+// DeleteTransaction removes a transaction using configured keys
+func (r *TransactionRepository) DeleteTransaction(ctx context.Context, accountID, transactionID string) error {
+	// Validate input using config keys
+	if accountID == "" {
+		return fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.PartitionKey)
+	}
 	if transactionID == "" {
-		return errors.New("transactionID cannot be empty")
+		return fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.SortKey)
 	}
 
-	// Define the primary key
+	// Define key using config
 	key := map[string]types.AttributeValue{
-		"TransactionID": &types.AttributeValueMemberS{Value: transactionID},
+		config.DBConfig.Keys.PartitionKey: &types.AttributeValueMemberS{Value: accountID},
+		config.DBConfig.Keys.SortKey:      &types.AttributeValueMemberS{Value: transactionID},
 	}
 
 	// Call DynamoDB delete function

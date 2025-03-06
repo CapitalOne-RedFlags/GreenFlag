@@ -2,9 +2,14 @@ package config
 
 // DynamoDBConfig stores table settings
 type DynamoDBConfig struct {
-	TableName        string
-	AllowedUpdateFields    map[string]bool
-	UpdateCondition  string
+	TableName           string
+	AllowedUpdateFields map[string]bool
+	UpdateCondition     string
+	// Add key configuration
+	Keys struct {
+		PartitionKey string
+		SortKey      string
+	}
 }
 
 var DBConfig = &DynamoDBConfig{
@@ -28,4 +33,11 @@ var DBConfig = &DynamoDBConfig{
 		"Email":                   true,
 	},
 	UpdateCondition: "TransactionStatus = :pending", // Only update if Pending
+	Keys: struct {
+		PartitionKey string
+		SortKey      string
+	}{
+		PartitionKey: "AccountID",
+		SortKey:      "TransactionID",
+	},
 }

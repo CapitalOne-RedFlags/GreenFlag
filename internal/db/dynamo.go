@@ -30,11 +30,15 @@ func NewDynamoDBClient(client *dynamodb.Client, tableName string) *DynamoDBClien
 // PutItem inserts an item into DynamoDB and returns metadata.
 func (d *DynamoDBClient) PutItem(ctx context.Context, item map[string]types.AttributeValue) (*dynamodb.PutItemOutput, string, error) {
 	output, err := d.Client.PutItem(ctx, &dynamodb.PutItemInput{
-		Item:                        item,
-		TableName:                   aws.String(d.TableName),
-		ConditionExpression:         aws.String("attribute_not_exists(TransactionID)"), // Prevent overwriting
-		ReturnConsumedCapacity:      types.ReturnConsumedCapacityTotal,                 // Capture write capacity
-		ReturnItemCollectionMetrics: types.ReturnItemCollectionMetricsSize,             // Capture item collection size
+		Item:      item,
+		TableName: aws.String(d.TableName),
+		ConditionExpression: aws.String(fmt.Sprintf(
+			"attribute_not_exists(%s) AND attribute_not_exists(%s)",
+			config.DBConfig.Keys.PartitionKey,
+			config.DBConfig.Keys.SortKey,
+		)),
+		ReturnConsumedCapacity:      types.ReturnConsumedCapacityTotal,
+		ReturnItemCollectionMetrics: types.ReturnItemCollectionMetricsSize,
 	})
 
 	// Handle duplicate transaction error
@@ -71,7 +75,7 @@ func (d *DynamoDBClient) GetItem(ctx context.Context, key map[string]types.Attri
 }
 
 // UpdateItem updates a transaction in DynamoDB, safely constructs NoSQL query to update. **MAKE SURE YOUR UPDATES WERE VALIDATED WITH TRANSACTION'S PAYLOAD FUNCTION!**
-func (d *DynamoDBClient) UpdateItem(ctx context.Context, transactionID string, updates map[string]interface{}) (*dynamodb.UpdateItemOutput, error) {
+func (d *DynamoDBClient) UpdateItem(ctx context.Context, key map[string]types.AttributeValue, updates map[string]interface{}) (*dynamodb.UpdateItemOutput, error) {
 
 	var updateExprBuilder strings.Builder
 	updateExprBuilder.WriteString("SET ")
@@ -102,16 +106,8 @@ func (d *DynamoDBClient) UpdateItem(ctx context.Context, transactionID string, u
 	updateExprBuilder.WriteString(strings.Join(parts, ", "))
 	updateExpr := updateExprBuilder.String()
 
-	// Define the primary key for the item
-	key := map[string]types.AttributeValue{
-		"TransactionID": &types.AttributeValueMemberS{Value: transactionID},
-	}
-
-	// Add condition: Only update if TransactionStatus is "Pending"
-	// exprAttrValues[":pending"] = &types.AttributeValueMemberS{Value: "Pending"}
-
 	input := &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(config.DBConfig.TableName),
+		TableName:                 aws.String(d.TableName),
 		Key:                       key,
 		UpdateExpression:          aws.String(updateExpr),
 		ConditionExpression:       aws.String(config.DBConfig.UpdateCondition),
