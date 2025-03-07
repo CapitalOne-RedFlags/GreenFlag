@@ -62,6 +62,8 @@ func (r *TransactionRepository) GetTransaction(ctx context.Context, accountID, t
 	if err != nil {
 		return nil, err // Handles "item not found" and other errors
 	}
+	// Print the actual DynamoDB item
+	fmt.Printf("Raw DynamoDB item before unmarshaling: %+v\n", item)
 
 	// Unmarshal into a Transaction struct
 	transaction, err := models.UnmarshalDynamoDB(item)
@@ -87,6 +89,7 @@ func (r *TransactionRepository) UpdateTransaction(ctx context.Context, accountID
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert transaction to update map: %w", err)
 	}
+	fmt.Println("Transaction update payload: ", updates)
 
 	// Ensure at least one field is provided for update
 	if len(updates) == 0 {

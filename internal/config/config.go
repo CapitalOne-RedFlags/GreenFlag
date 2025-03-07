@@ -3,12 +3,27 @@ package config
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/joho/godotenv"
 )
+
+// LoadEnv loads environment variables from a .env file
+func LoadEnv() {
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Println("Warning: No .env file found or failed to load.")
+	}
+
+	// log.Printf("DEBUG: AWS_ACCESS_KEY_ID=%s\n", os.Getenv("AWS_ACCESS_KEY_ID"))
+	// log.Printf("DEBUG: AWS_SECRET_ACCESS_KEY=%s\n", os.Getenv("AWS_SECRET_ACCESS_KEY"))
+	// log.Printf("DEBUG: AWS_SESSION_TOKEN=%s\n", os.Getenv("AWS_SESSION_TOKEN")) // Optional
+	// log.Printf("DEBUG: AWS_REGION=%s\n", os.Getenv("AWS_REGION"))
+}	
 
 // DBConfig stores table settings
 var DBConfig = &struct {
@@ -20,36 +35,7 @@ var DBConfig = &struct {
 		PartitionKey string
 		SortKey      string
 	}
-}{
-	TableName:        GetEnv("DYNAMODB_TABLE_NAME", "TransactionsTable"),
-	DynamoDBEndpoint: GetEnv("DYNAMODB_ENDPOINT", "http://localhost:8000"),
-	AllowedUpdateFields: map[string]bool{
-		"TransactionStatus":       true,
-		"TransactionAmount":       true,
-		"TransactionDate":         true,
-		"Location":                true,
-		"DeviceID":                true,
-		"IPAddress":               true,
-		"MerchantID":              true,
-		"Channel":                 true,
-		"CustomerAge":             true,
-		"CustomerOccupation":      true,
-		"TransactionDuration":     true,
-		"LoginAttempts":           true,
-		"AccountBalance":          true,
-		"PreviousTransactionDate": true,
-		"PhoneNumber":             true,
-		"Email":                   true,
-	},
-	UpdateCondition: "TransactionStatus = :pending",
-	Keys: struct {
-		PartitionKey string
-		SortKey      string
-	}{
-		PartitionKey: "AccountID",
-		SortKey:      "TransactionID",
-	},
-}
+}{}
 
 // AWSConfig stores AWS-specific configurations
 type AWSConfig struct {
@@ -97,11 +83,45 @@ func LoadAWSConfig(ctx context.Context) (*AWSConfig, error) {
 	}, nil
 }
 
+// InitializeConfig initializes the configuration by loading environment variables
+func InitializeConfig() {
+	LoadEnv() // Load .env variables
+
+	DBConfig.TableName = GetEnv("DYNAMODB_TABLE_NAME", "TransactionsTable")
+	DBConfig.DynamoDBEndpoint = GetEnv("DYNAMODB_ENDPOINT", "http://localhost:8000")
+	DBConfig.AllowedUpdateFields = map[string]bool{
+		"TransactionStatus":       true,
+		"TransactionAmount":       true,
+		"TransactionDate":         true,
+		"Location":                true,
+		"DeviceID":                true,
+		"IPAddress":               true,
+		"MerchantID":              true,
+		"Channel":                 true,
+		"CustomerAge":             true,
+		"CustomerOccupation":      true,
+		"TransactionDuration":     true,
+		"LoginAttempts":           true,
+		"AccountBalance":          true,
+		"PreviousTransactionDate": true,
+		"PhoneNumber":             true,
+		"Email":                   true,
+	}
+	DBConfig.UpdateCondition = "TransactionStatus = Pending"
+	DBConfig.Keys = struct {
+		PartitionKey string
+		SortKey      string
+	}{
+		PartitionKey: "AccountID",
+		SortKey:      "TransactionID",
+	}
+}
+
 func IsCI() bool {
 	return GetEnv("CI", "false") == "true"
 }
 
-func PrinDBConfig() {
+func PrintDBConfig() {
 	fmt.Printf("DynamoDB Table: %s\n", DBConfig.TableName)
 	fmt.Printf("DynamoDB Endpoint: %s\n", DBConfig.DynamoDBEndpoint)
 	fmt.Printf("AWS Region: %s\n", GetEnv("AWS_REGION", "us-east-1"))

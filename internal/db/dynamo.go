@@ -89,7 +89,7 @@ func (d *DynamoDBClient) UpdateItem(ctx context.Context, key map[string]types.At
 		// Use safe placeholders for attribute names & values
 		placeholder := fmt.Sprintf("#F%d", i)
 		valuePlaceholder := fmt.Sprintf(":V%d", i)
-
+		if field == "TransactionID" || field == "AccountID" {continue}
 		parts = append(parts, fmt.Sprintf("%s = %s", placeholder, valuePlaceholder))
 		exprAttrNames[placeholder] = field
 
@@ -110,7 +110,7 @@ func (d *DynamoDBClient) UpdateItem(ctx context.Context, key map[string]types.At
 		TableName:                 aws.String(d.TableName),
 		Key:                       key,
 		UpdateExpression:          aws.String(updateExpr),
-		ConditionExpression:       aws.String(config.DBConfig.UpdateCondition),
+		// ConditionExpression:       aws.String(config.DBConfig.UpdateCondition),
 		ExpressionAttributeNames:  exprAttrNames,
 		ExpressionAttributeValues: exprAttrValues,
 		ReturnValues:              types.ReturnValueUpdatedNew,

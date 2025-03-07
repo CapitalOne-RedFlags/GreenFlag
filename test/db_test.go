@@ -34,39 +34,53 @@ func TestTransactionRepositorySuite(t *testing.T) {
 
 // SetupSuite runs before all tests
 func (s *TransactionRepositoryTestSuite) SetupSuite() {
+	
+	config.InitializeConfig()
 	s.ctx = context.Background()
 
-	// Initialize configurations
-
-	// Skip test in CI if no endpoint is configured
-	if config.IsCI() && config.DBConfig.DynamoDBEndpoint == "http://localhost:8000" {
-		s.T().Skip("Skipping DynamoDB integration tests in CI: No endpoint configured.")
-		return
-	}
-
 	// Print config for debugging
-	config.PrinDBConfig()
+	config.PrintDBConfig()
 
-	// Generate a unique table name per test run
+	// Generate a unique table name per test run (if needed)
 	s.tableName = fmt.Sprintf("%s-%s", config.DBConfig.TableName, uuid.New().String())
 
-	awsConf, err := config.LoadAWSConfig(context.Background())
+	// Load AWS configuration
+	awsConf, err := config.LoadAWSConfig(s.ctx)
 	if err != nil {
 		log.Fatalf("Failed to initialize AWS config: %v", err)
 	}
+
+	// Initialize DynamoDB client
 	s.dbClient = db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConf.Config), s.tableName)
 	s.repository = db.NewTransactionRepository(s.dbClient)
 
 	// Update config for this test instance
 	config.DBConfig.TableName = s.tableName
 
-	// Create test table
+	// Ensure the test table exists before running tests
 	s.createTestTable(s.dbClient.Client)
 }
 
-// Create a test table for DynamoDB
+
 func (s *TransactionRepositoryTestSuite) createTestTable(client *dynamodb.Client) {
-	_, err := client.CreateTable(s.ctx, &dynamodb.CreateTableInput{
+	// Check if the table already exists
+	_, err := client.DescribeTable(s.ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(s.tableName),
+	})
+
+	// If the table exists, log and return
+	if err == nil {
+		s.T().Logf("Table %s already exists, skipping creation.", s.tableName)
+		return
+	}
+
+	// If the error is NOT "ResourceNotFoundException", fail the test
+	if !strings.Contains(err.Error(), "ResourceNotFoundException") {
+		s.T().Fatalf("Failed to check if table exists: %v", err)
+	}
+
+	// Create the table since it doesn't exist
+	_, err = client.CreateTable(s.ctx, &dynamodb.CreateTableInput{
 		TableName: aws.String(s.tableName),
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
@@ -91,16 +105,16 @@ func (s *TransactionRepositoryTestSuite) createTestTable(client *dynamodb.Client
 		BillingMode: types.BillingModePayPerRequest,
 	})
 
-	// Ignore existing table errors
-	if err != nil && !strings.Contains(err.Error(), "ResourceInUseException") {
+	if err != nil {
 		s.T().Fatalf("Failed to create test table: %v", err)
 	}
 
-	// Wait until table is active
+	// Wait for the table to be active before using it
 	waiter := dynamodb.NewTableExistsWaiter(client)
 	err = waiter.Wait(s.ctx, &dynamodb.DescribeTableInput{
 		TableName: aws.String(s.tableName),
-	}, 30*time.Second)
+	}, 60*time.Second)
+
 	if err != nil {
 		s.T().Fatalf("Failed waiting for table to be active: %v", err)
 	}
@@ -118,7 +132,6 @@ func (s *TransactionRepositoryTestSuite) TearDownSuite() {
 		s.T().Logf("Failed to delete test table %s: %v", s.tableName, err)
 	}
 }
-
 
 // createValidTransaction creates a valid sample transaction for tests
 func (s *TransactionRepositoryTestSuite) createValidTransaction() models.Transaction {
