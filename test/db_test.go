@@ -34,7 +34,7 @@ func TestTransactionRepositorySuite(t *testing.T) {
 
 // SetupSuite runs before all tests
 func (s *TransactionRepositoryTestSuite) SetupSuite() {
-	
+
 	config.InitializeConfig()
 	s.ctx = context.Background()
 
@@ -60,7 +60,6 @@ func (s *TransactionRepositoryTestSuite) SetupSuite() {
 	// Ensure the test table exists before running tests
 	s.createTestTable(s.dbClient.Client)
 }
-
 
 func (s *TransactionRepositoryTestSuite) createTestTable(client *dynamodb.Client) {
 	// Check if the table already exists

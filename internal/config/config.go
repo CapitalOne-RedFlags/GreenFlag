@@ -23,7 +23,7 @@ func LoadEnv() {
 	// log.Printf("DEBUG: AWS_SECRET_ACCESS_KEY=%s\n", os.Getenv("AWS_SECRET_ACCESS_KEY"))
 	// log.Printf("DEBUG: AWS_SESSION_TOKEN=%s\n", os.Getenv("AWS_SESSION_TOKEN")) // Optional
 	// log.Printf("DEBUG: AWS_REGION=%s\n", os.Getenv("AWS_REGION"))
-}	
+}
 
 // DBConfig stores table settings
 var DBConfig = &struct {
@@ -31,7 +31,7 @@ var DBConfig = &struct {
 	DynamoDBEndpoint    string
 	AllowedUpdateFields map[string]bool
 	UpdateCondition     string
-	Keys               struct {
+	Keys                struct {
 		PartitionKey string
 		SortKey      string
 	}
@@ -87,7 +87,7 @@ func LoadAWSConfig(ctx context.Context) (*AWSConfig, error) {
 func InitializeConfig() {
 	LoadEnv() // Load .env variables
 
-	DBConfig.TableName = GetEnv("DYNAMODB_TABLE_NAME", "TransactionsTable")
+	DBConfig.TableName = GetEnv("DYNAMODB_TABLE_NAME", "TestTransactionsTable")
 	DBConfig.DynamoDBEndpoint = GetEnv("DYNAMODB_ENDPOINT", "http://localhost:8000")
 	DBConfig.AllowedUpdateFields = map[string]bool{
 		"TransactionStatus":       true,
