@@ -18,9 +18,9 @@ type DBConfig struct {
 var AppConfig Config
 
 func init() {
-    // Initialize SQS configuration
+    // Initialize SQS configuration TODO: change to the correct queue url
     AppConfig.SQSConfig = SQSConfig{
-        QueueURL: "https://sqs.us-east-1.amazonaws.com/YOUR_ACCOUNT_ID/bank-transactions",
+        QueueURL: "https://sqs.us-east-1.amazonaws.com/140023383737/Bank_Transactions",
     }
 
     // Initialize DB configuration
