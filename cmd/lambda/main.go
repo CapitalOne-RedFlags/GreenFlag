@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
-	"your-project/internal/models"
-	"your-project/internal/db"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 )
 
 func handleRequest(ctx context.Context, sqsEvent events.SQSEvent) error {
