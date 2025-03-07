@@ -6,6 +6,22 @@ on:
     branches: [ main ]
 
 jobs:
+  security-checks:
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - name: Install Trivy
+          run: |
+            sudo apt-get install -y wget
+            wget https://github.com/aquasecurity/trivy/releases/download/v0.45.0/trivy_0.45.0_Linux-64bit.deb
+            sudo dpkg -i trivy_0.45.0_Linux-64bit.deb
+
+        - name: Run Security Scan
+          run: trivy fs --exit-code 1 --severity CRITICAL,HIGH .
+          
   unit_tests:
     runs-on: ubuntu-latest
     env:
