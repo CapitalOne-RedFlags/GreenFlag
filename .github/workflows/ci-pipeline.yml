@@ -1,0 +1,57 @@
+name: ci-pipeline
+
+on:
+  pull_request:
+    types: [ opened, synchronize, closed ]
+    branches: [ main ]
+
+jobs:
+  unit_tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.2
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Run Linter
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Run Unit Tests
+        run: go test -v ./test -coverprofile=coverage.out
+
+      - name: Upload Test Coverage Report # view coverage report at https://app.codecov.io/gh/CapitalOne-RedFlags/GreenFlag
+        if: ${{ success() }}
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage.out
+          fail_ci_if_error: false
+
+  security-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.45.0/trivy_0.45.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.45.0_Linux-64bit.deb
+
+      - name: Run Security Scan
+        run: trivy fs --exit-code 1 --severity CRITICAL,HIGH .
+      
+  
+
