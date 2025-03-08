@@ -3,13 +3,12 @@ package test
 import (
 	"context"
 	"errors"
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/google/uuid"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/stretchr/testify/assert"
@@ -120,7 +119,7 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 
 func (suite *PredictFraudTestSuite) TestHandleRequest() {
 	// Arrange
-	testTxn := GetTestTransaction("test@example.com")
+	testTxn1 := GetTestTransaction("test@example.com")
 
 	event := events.DynamoDBEvent{
 		Records: []events.DynamoDBEventRecord{
@@ -128,13 +127,13 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 				EventID:   "1",
 				EventName: "INSERT",
 				Change: events.DynamoDBStreamRecord{
-					NewImage: toDynamoDBAttributeValues(&testTxn),
+					NewImage: testTxn1.ToDynamoDBAttributeValueMap(),
 				},
 			},
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn}).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return(nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
@@ -144,34 +143,41 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 	assert.Nil(suite.T(), err)
 }
 
-// TODO: Move to transaction model. May need to add support for more types if DB grows
-func toDynamoDBAttributeValues(txn *models.Transaction) map[string]events.DynamoDBAttributeValue {
-	val := reflect.ValueOf(txn)
-	typ := reflect.TypeOf(txn)
+func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
+	// Arrange
+	testTxn1 := GetTestTransaction("test@example.com")
+	testTxn2 := GetTestTransaction("jpconnell4@wisc.eud")
+	testTxn3 := GetTestTransaction("test@example.com")
+	shouldSucceed := []models.Transaction{testTxn1, testTxn2}
 
-	avMap := make(map[string]events.DynamoDBAttributeValue)
-
-	if val.Kind() == reflect.Struct {
-		for i := 0; i < val.NumField(); i++ {
-			field := val.Field(i)
-			fieldName := typ.Field(i).Name
-			fmt.Printf("Field: %s, Value: %v\n", fieldName, field.Interface())
-
-			switch field.Kind() {
-			case reflect.String:
-				avMap[fieldName] = events.NewStringAttribute(field.String())
-			case reflect.Float64:
-				avMap[fieldName] = events.NewNumberAttribute(field.String())
-			case reflect.Int:
-				avMap[fieldName] = events.NewNumberAttribute(field.String())
-			default:
-			}
-		}
+	event := events.DynamoDBEvent{
+		Records: []events.DynamoDBEventRecord{
+			getDynamoDBEventRecord(testTxn1, "INSERT"),
+			getDynamoDBEventRecord(testTxn2, "INSERT"),
+			getDynamoDBEventRecord(testTxn3, "MODIFY"),
+		},
 	}
 
-	return avMap
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return(nil).Twice()
+	handler := handlers.NewFraudHandler(suite.mockFraudService)
+
+	// Act
+	err := handler.ProcessFraudEvent(context.TODO(), event)
+
+	// Assert
+	assert.Nil(suite.T(), err)
 }
 
 func TestPredictFraudSuite(t *testing.T) {
 	suite.Run(t, new(PredictFraudTestSuite))
+}
+
+func getDynamoDBEventRecord(txn models.Transaction, dbEventType string) events.DynamoDBEventRecord {
+	return events.DynamoDBEventRecord{
+		EventID:   uuid.New().String(),
+		EventName: dbEventType,
+		Change: events.DynamoDBStreamRecord{
+			NewImage: txn.ToDynamoDBAttributeValueMap(),
+		},
+	}
 }
