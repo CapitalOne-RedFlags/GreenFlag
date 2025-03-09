@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, repository *db.TransactionRepository) {
+func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, repository db.TransactionRepository) {
 
 	var transactions []models.Transaction
 	for _, record := range event.Records {
