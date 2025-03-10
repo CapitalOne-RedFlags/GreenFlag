@@ -1,12 +1,12 @@
 package services
 
 import (
-	"errors"
 	"sync"
 
 	"slices"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
 
@@ -48,19 +48,10 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 	wg.Wait()
 	close(errorResults)
 
-	return mergeErrors(errorResults)
+	return middleware.MergeErrors(errorResults)
 }
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm
 func predictFraud(transaction models.Transaction) (bool, error) {
 	return slices.Contains([]string{"rshart@wisc.edu", "jpconnell4@wisc.eud"}, transaction.Email), nil
-}
-
-func mergeErrors(errCh <-chan error) error {
-	result := []error{}
-	for err := range errCh {
-		result = append(result, err)
-	}
-
-	return errors.Join(result...)
 }
