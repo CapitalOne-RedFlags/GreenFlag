@@ -1,10 +1,13 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/go-playground/validator"
@@ -41,11 +44,20 @@ func (t *Transaction) MarshalDynamoDB() (map[string]types.AttributeValue, error)
 // UnmarshalDynamoDB unmarshals a DynamoDB attribute map into a Transaction.
 func UnmarshalDynamoDB(av map[string]types.AttributeValue) (*Transaction, error) {
 	var trans Transaction
-	fmt.Printf("Raw item before unmarshaling: %+v\n", av)
 	if err := attributevalue.UnmarshalMap(av, &trans); err != nil {
 		return nil, err
 	}
 	return &trans, nil
+}
+
+func UnmarshalSQS(trasaction string) (*Transaction, error) {
+	var result Transaction
+	err := json.Unmarshal([]byte(trasaction), &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+
 }
 
 // ValidateTransaction validates an incoming transaction.
@@ -121,4 +133,29 @@ func isEmpty(attr types.AttributeValue) bool {
 	default:
 		return false
 	}
+}
+
+func (txn *Transaction) ToDynamoDBAttributeValueMap() map[string]events.DynamoDBAttributeValue {
+	val := reflect.ValueOf(*txn)
+	typ := reflect.TypeOf(*txn)
+
+	avMap := make(map[string]events.DynamoDBAttributeValue)
+
+	if val.Kind() == reflect.Struct {
+		for i := 0; i < val.NumField(); i++ {
+			field := val.Field(i)
+			fieldName := typ.Field(i).Name
+
+			switch field.Kind() {
+			case reflect.String:
+				avMap[fieldName] = events.NewStringAttribute(field.String())
+			case reflect.Float64, reflect.Int:
+				avMap[fieldName] = events.NewNumberAttribute(fmt.Sprintf("%v", field.Interface()))
+			default:
+				avMap[fieldName] = events.NewNullAttribute()
+			}
+		}
+	}
+
+	return avMap
 }
