@@ -12,17 +12,25 @@ import (
 )
 
 // TransactionRepository is the data access layer for transactions.
-type TransactionRepository struct {
+type TransactionRepository interface {
+	SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error)
+	GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error)
+	UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error)
+	DeleteTransaction(ctx context.Context, accountID, transactionID string) error
+}
+
+// ✅ Concrete Implementation of the Interface
+type DynamoTransactionRepository struct {
 	DB *DynamoDBClient
 }
 
 // NewTransactionRepository initializes a new repository instance.
-func NewTransactionRepository(db *DynamoDBClient) *TransactionRepository {
-	return &TransactionRepository{DB: db}
+func NewTransactionRepository(db *DynamoDBClient) TransactionRepository {
+	return &DynamoTransactionRepository{DB: db}
 }
 
 // SaveTransaction validates and inserts a new transaction.
-func (r *TransactionRepository) SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error) {
+func (r *DynamoTransactionRepository) SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error) {
 	if err := t.ValidateTransaction(); err != nil {
 		return nil, "", fmt.Errorf("validation failed: %w", err)
 	}
@@ -42,7 +50,7 @@ func (r *TransactionRepository) SaveTransaction(ctx context.Context, t *models.T
 }
 
 // GetTransaction retrieves a transaction by AccountID and TransactionID
-func (r *TransactionRepository) GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error) {
+func (r *DynamoTransactionRepository) GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error) {
 	// Validate input using config keys
 	if accountID == "" {
 		return nil, fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.PartitionKey)
@@ -75,7 +83,7 @@ func (r *TransactionRepository) GetTransaction(ctx context.Context, accountID, t
 }
 
 // UpdateTransaction updates a transaction's fields.
-func (r *TransactionRepository) UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error) {
+func (r *DynamoTransactionRepository) UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error) {
 	// Validate input using config keys
 	if accountID == "" {
 		return nil, fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.PartitionKey)
@@ -113,7 +121,7 @@ func (r *TransactionRepository) UpdateTransaction(ctx context.Context, accountID
 }
 
 // DeleteTransaction removes a transaction using configured keys
-func (r *TransactionRepository) DeleteTransaction(ctx context.Context, accountID, transactionID string) error {
+func (r *DynamoTransactionRepository) DeleteTransaction(ctx context.Context, accountID, transactionID string) error {
 	// Validate input using config keys
 	if accountID == "" {
 		return fmt.Errorf("%s cannot be empty", config.DBConfig.Keys.PartitionKey)
