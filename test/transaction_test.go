@@ -5,10 +5,12 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -46,6 +48,7 @@ func (m *MockTransactionRepository) DeleteTransaction(ctx context.Context, accou
 // ✅ Define Test Suite
 type TransactionServiceTestSuite struct {
 	suite.Suite
+	testRepo TransactionRepositoryTestSuite
 	mockRepo *MockTransactionRepository
 	ctx      context.Context
 }
@@ -137,6 +140,44 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_MultipuleFailur
 	assert.Error(suite.T(), err, "Should  return an error when transaction is partially saved")
 	assert.Len(suite.T(), strings.Split(err.Error(), "\n"), 2)
 
+}
+
+func (suite *TransactionServiceTestSuite) TestTransactionService_integration() {
+	suite.testRepo.SetupSuite()
+
+	var testTransaction []models.Transaction
+	testTransaction = append(testTransaction,
+		models.Transaction{
+			TransactionID:           uuid.New().String(),
+			AccountID:               "TEST-" + uuid.New().String(),
+			TransactionAmount:       100.50,
+			TransactionDate:         time.Now().Format(time.RFC3339),
+			TransactionType:         "PURCHASE",
+			Location:                "New York",
+			DeviceID:                "device-123",
+			IPAddress:               "192.168.1.1",
+			MerchantID:              "merchant-456",
+			Channel:                 "WEB",
+			CustomerAge:             30,
+			CustomerOccupation:      "Engineer",
+			TransactionDuration:     120,
+			LoginAttempts:           1,
+			AccountBalance:          5000.00,
+			PreviousTransactionDate: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+			PhoneNumber:             "+12025550179",
+			Email:                   "test@example.com",
+			TransactionStatus:       "PENDING",
+		},
+	)
+
+	serviceErr := services.TransactionService(suite.ctx, testTransaction, suite.testRepo.repository)
+	suite.mockRepo.AssertExpectations(suite.T())
+	assert.NoError(suite.T(), serviceErr, "Should not return an error when transactions are saved")
+
+	res, getTransErr := suite.testRepo.repository.GetTransaction(suite.ctx, testTransaction[0].AccountID, testTransaction[0].TransactionID)
+	assert.NoError(suite.T(), getTransErr, "Should not return an error when transactions are saved")
+	assert.NotNil(suite.T(), res)
+	assert.Equal(suite.T(), testTransaction[0], *res)
 }
 
 // Run All Tests
