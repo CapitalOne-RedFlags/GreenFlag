@@ -54,7 +54,7 @@ func UnmarshalSQS(trasaction string) (*Transaction, error) {
 	var result Transaction
 	err := json.Unmarshal([]byte(trasaction), &result)
 	if err != nil {
-		//Do SOmething
+		return nil, err
 	}
 	return &result, nil
 
