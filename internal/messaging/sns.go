@@ -107,6 +107,10 @@ func (messenger *GfSNSMessenger) SubscribeToSNSTopic(protocol string, endpoint s
 		AttributeValue:  aws.String(*filterPolicy),
 	})
 
+	if err != nil {
+		return nil, fmt.Errorf("Failed to set subscription attributes: %s", err)
+	}
+
 	return subscribeOutput, nil
 }
 
