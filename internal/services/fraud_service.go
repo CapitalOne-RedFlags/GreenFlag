@@ -18,9 +18,9 @@ type GfFraudService struct {
 	EventDispatcher events.EventDispatcher
 }
 
-func NewFraudService(e events.EventDispatcher) *GfFraudService {
+func NewFraudService(dispatcher events.EventDispatcher) *GfFraudService {
 	return &GfFraudService{
-		EventDispatcher: e,
+		EventDispatcher: dispatcher,
 	}
 }
 
@@ -53,6 +53,6 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm
 func predictFraud(transaction models.Transaction) (bool, error) {
-	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu"}, transaction.Email), nil
+	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu", "c1redflagstest@gmail.com"}, transaction.Email), nil
 
 }

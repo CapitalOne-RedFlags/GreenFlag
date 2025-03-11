@@ -70,8 +70,6 @@ func (r *DynamoTransactionRepository) GetTransaction(ctx context.Context, accoun
 	if err != nil {
 		return nil, err // Handles "item not found" and other errors
 	}
-	// Print the actual DynamoDB item
-	fmt.Printf("Raw DynamoDB item before unmarshaling: %+v\n", item)
 
 	// Unmarshal into a Transaction struct
 	transaction, err := models.UnmarshalDynamoDB(item)
