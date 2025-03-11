@@ -16,13 +16,8 @@ TRANSACTION_FUNCTION=TransactionPipelineFunction
 FRAUD_FUNCTION=FraudPipelineFunction
 STACK_NAME=TransactionConsumerStack
 PROFILE=AdministratorAccess-140023383737
-TEMPLATE_FILE=$(ROOT_DIR)/template.yaml
+TEMPLATE_FILE=$(ROOT_DIR)/deployments/template.yaml
 
-# Ensure build directories exist
-.PHONY: build-dir
-build-dir:
-	mkdir -p $(TRANSACTION_BUILD_DIR)
-	mkdir -p $(FRAUD_BUILD_DIR)
 
 # Debug target to display variable values
 .PHONY: debug
@@ -47,7 +42,7 @@ build-FraudPipelineFunction:
 .PHONY: build
 build: build-transaction build-fraud
 
-# Run sam build to trigger the Makefile integration (SAM will call the above targets)
+# Run sam build to trigger the Makefile integration.
 .PHONY: sam-build
 sam-build:
 	sam build -t $(TEMPLATE_FILE) --profile $(PROFILE)

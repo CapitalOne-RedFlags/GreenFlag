@@ -102,42 +102,103 @@ Ensure you have the following installed:
 ## **Deployment**
 The project uses AWS **SAM (Serverless Application Model)** for deployment.
 
-### **1️⃣ Build the Application**
-```sh
-sam build --template-file deployments/template.yaml
-```
 
-### **2️⃣ Deploy to AWS**
+## **Deploy to AWS**
+To deploy the project to AWS, use the following command:
 ```sh
 sam deploy --template-file deployments/template.yaml --guided
 ```
 This will:
-- Package and upload the Lambda function.
-- Create an SQS queue, SNS topic, and DynamoDB table.
+- Package and upload the Lambda functions.
+- Hook your lambda to an SQS queue, SNS topic, and DynamoDB table.
 - Deploy necessary IAM roles and permissions.
 
-
-### **3️⃣ Testing Locally**
-#### **Test Lambda Function Locally**
+### **Manually Send a Transaction to SQS**
+Send a test transaction to the SQS queue:
 ```sh
-sam local invoke TransactionProcessor --event test_event.json
+aws sqs send-message --queue-url <YOUR_QUEUE_URL> --message-body '{"transactionID": "123", "amount": 50, ...}'
 ```
-
-#### **Manually Send a Transaction to SQS**
+Example:
 ```sh
-aws sqs send-message --queue-url <YOUR_QUEUE_URL> --message-body '{"transactionID": "123", "amount": 50}'
-```
+aws sqs send-message --queue-url "https://sqs.us-east-1.amazonaws.com/140023383737/Bank_Transactions" --message-body '{
+      "transactionId": "5f6783c5-abc7-45b3-b8a9-4a7b71c2e13b",
+      "accountId": "TEST-9b5d1f2b-7b41-4d1b-a6ad-872ea97e1e72",
+      "amount": 100.5,
+      "transactionDate": "2025-03-11T10:12:34Z",
+      "transactionType": "PURCHASE",
+      "location": "New York",
+      "deviceId": "device-123",
+      "ipAddress": "192.168.1.1",
+      "merchantId": "merchant-456",
+      "channel": "WEB",
+      "customerAge": 30,
+      "customerOccupation": "Engineer",
+      "transactionDuration": 120,
+      "loginAttempts": 1,
+      "accountBalance": 5000.0,
+      "previousTransactionDate": "2025-03-10T10:12:34Z",
+      "phoneNumber": "+12025550179",
+      "email": "test@example.com",
+      "transactionStatus": "PENDING"
+    }' --profile AdministratorAccess-140023383737
 
-#### **Query DynamoDB Table**
+```
+### **Query DynamoDB Table**
+Retrieve all records from the DynamoDB table:
 ```sh
 aws dynamodb scan --table-name Transactions
 ```
-
+Example:
+```sh
+aws dynamodb scan --table-name Transactions --profile AdministratorAccess-140023383737 > output.txt
+```
 ## **Monitoring & Logs**
 To check logs for AWS Lambda:
 ```sh
 aws logs tail /aws/lambda/TransactionProcessor --follow
 ```
+Example:
+```sh
+aws logs tail /aws/lambda/TransactionPipelineFunction --follow --profile AdministratorAccess-140023383737
+```
+## **Build, Dev & Deployment Process**
 
+### **Build Configuration**
+The project uses a `Makefile` for build automation. When running these commands, make sure you are at project root (GreenFlag). Below are the key commands and their purposes:
+
+
+### **Building the Lambda Functions**
+To build the `TransactionPipelineFunction`:
+```sh
+make build-TransactionPipelineFunction
+```
+To build the `FraudPipelineFunction`:
+```sh
+make build-FraudPipelineFunction
+```
+To build both functions:
+```sh
+make build
+```
+
+### **Iterative Deployment with SAM Sync**
+For iterative deployments (think of it as a dev environment, nodejs's hot reload but on steroids), use:
+```sh
+make sync
+```
+
+### **Deploying the Stack**
+When your code is ready after testing, Deploy using AWS SAM:
+```sh
+make deploy
+```
+
+### **Cleaning Up Resources**
+To delete the CloudFormation stack and clean build artifacts, useful when you're looking to nuke the entire consumer infrastructure:
+```sh
+make clean
+```
+
+More documentation can be found within the makefile itself.
 
 

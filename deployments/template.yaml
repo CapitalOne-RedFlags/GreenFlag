@@ -68,7 +68,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: TransactionPipelineFunction
-      CodeUri: .
+      CodeUri: ../
       Handler: bootstrap
       Runtime: provided.al2
       Environment:
@@ -107,7 +107,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: FraudPipelineFunction
-      CodeUri: .
+      CodeUri: ../
       Handler: bootstrap
       Runtime: provided.al2
       
