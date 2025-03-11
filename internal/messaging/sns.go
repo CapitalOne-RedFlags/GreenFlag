@@ -76,11 +76,19 @@ func (messenger *GfSNSMessenger) PublishEmailMessage(transaction models.Transact
 }
 
 func (messenger *GfSNSMessenger) SubscribeToSNSTopic(protocol string, endpoint string, accountId string) (*sns.SubscribeOutput, error) {
+	filterPolicy, err := GetFilterPolicy(accountId)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get filter policy: %s\n", err)
+	}
 
 	input := &sns.SubscribeInput{
 		TopicArn: aws.String(messenger.TopicArn),
 		Protocol: aws.String(protocol), // "email", "sms", "lambda", etc.
 		Endpoint: aws.String(endpoint), // email address or phone number
+		Attributes: map[string]string{
+			"FilterPolicy": *filterPolicy,
+		},
+		ReturnSubscriptionArn: true,
 	}
 
 	subscribeOutput, err := messenger.Client.Subscribe(context.TODO(), input)
@@ -88,16 +96,11 @@ func (messenger *GfSNSMessenger) SubscribeToSNSTopic(protocol string, endpoint s
 		return nil, fmt.Errorf("failed to subscribe to SNS topic: %v", err)
 	}
 
-	filterPolicy, err := GetFilterPolicy(accountId)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get filter policy: %s\n", err)
-	}
-
-	_, err = messenger.Client.SetSubscriptionAttributes(context.TODO(), &sns.SetSubscriptionAttributesInput{
-		SubscriptionArn: aws.String(*subscribeOutput.SubscriptionArn),
-		AttributeName:   aws.String("FilterPolicy"),
-		AttributeValue:  aws.String(*filterPolicy),
-	})
+	// _, err = messenger.Client.SetSubscriptionAttributes(context.TODO(), &sns.SetSubscriptionAttributesInput{
+	// 	SubscriptionArn: aws.String(*subscribeOutput.SubscriptionArn),
+	// 	AttributeName:   aws.String("FilterPolicy"),
+	// 	AttributeValue:  aws.String(*filterPolicy),
+	// })
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to set subscription attributes: %s", err)
