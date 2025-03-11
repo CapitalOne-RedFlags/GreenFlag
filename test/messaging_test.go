@@ -53,11 +53,10 @@ func (s *SNSMessagingTestSuite) TestSendEmailAlert() {
 	txn := GetTestTransaction("c1redflagstest@gmail.com")
 
 	// Act
-	output, topicArn, err := s.snsMessenger.SendEmailAlert(txn)
+	output, err := s.snsMessenger.SendEmailAlert(txn)
 
 	// Assert
 	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), topicArn)
 	assert.NotNil(s.T(), output)
 }
 

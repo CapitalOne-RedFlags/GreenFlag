@@ -12,7 +12,7 @@ import (
 )
 
 type SNSMessenger interface {
-	SendEmailAlert(transaction models.Transaction) (*sns.PublishOutput, *string, error)
+	SendEmailAlert(transaction models.Transaction) (*sns.PublishOutput, error)
 }
 
 type GfSNSMessenger struct {
