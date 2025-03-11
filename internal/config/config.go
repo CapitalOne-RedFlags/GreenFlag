@@ -14,9 +14,16 @@ import (
 
 // LoadEnv loads environment variables from a .env file
 func LoadEnv() {
-	err := godotenv.Load("../.env")
+	// Try multiple possible locations for .env file
+	err := godotenv.Load()  // Try current directory
 	if err != nil {
-		log.Println("Warning: No .env file found or failed to load.")
+		err = godotenv.Load("../.env")  // Try parent directory
+		if err != nil {
+			err = godotenv.Load("../../.env")  // Try project root
+			if err != nil {
+				log.Println("Warning: No .env file found or failed to load.")
+			}
+		}
 	}
 
 	// log.Printf("DEBUG: AWS_ACCESS_KEY_ID=%s\n", os.Getenv("AWS_ACCESS_KEY_ID"))
