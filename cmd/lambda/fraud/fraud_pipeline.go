@@ -1,4 +1,4 @@
-package fraudMain
+package main
 
 import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"

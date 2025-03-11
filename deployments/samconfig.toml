@@ -1,0 +1,26 @@
+version = 0.1
+
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "TransactionConsumerStack"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+
+parameter_overrides = [
+  "TransactionQueueARN=arn:aws:sqs:us-east-1:140023383737:Bank_Transactions",
+  "DynamoDBTableName=Transactions",
+  "AWSRegion=us-east-1"
+]
+
+[default.sync]
+[default.sync.parameters]
+stack_name = "TransactionConsumerStack"
+watch = true
+region = "us-east-1"
+profile = "AdministratorAccess-140023383737"
+parameter_overrides = [
+  "TransactionQueueARN=arn:aws:sqs:us-east-1:140023383737:Bank_Transactions",
+  "DynamoDBTableName=Transactions",
+  "AWSRegion=us-east-1"
+]
