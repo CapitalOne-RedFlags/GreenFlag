@@ -101,7 +101,7 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 	transactions := []models.Transaction{
 		{Email: "jalarsen5@wisc.edu"},
 		{Email: "rshart@wisc.edu"},
-		{Email: "jpconnell4@wisc.eud"},
+		{Email: "jpoconnell4@wisc.edu"},
 	}
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[1]).Return(nil).Once()
