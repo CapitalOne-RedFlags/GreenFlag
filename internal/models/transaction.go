@@ -159,3 +159,11 @@ func (txn *Transaction) ToDynamoDBAttributeValueMap() map[string]events.DynamoDB
 
 	return avMap
 }
+
+// Get subject, message for an email fraud alert
+func (txn *Transaction) GetFraudEmailContent() (string, string) {
+	return "Suspicious Activity on Your Credit Card", fmt.Sprintf(
+		`"CAPITAL ONE: We detected a suspicious transaction on your card ending in 1234 for $%.2f at StoreXYZ
+on Jan 31 at 3:15 PM. If this was you, reply YES. If not, reply NO or call us at 1-800-XXX-XXXX immediately.
+Do not share your account details with anyone."`, txn.TransactionAmount)
+}

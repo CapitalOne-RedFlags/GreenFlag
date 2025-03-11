@@ -18,9 +18,9 @@ type GfFraudService struct {
 	EventDispatcher events.EventDispatcher
 }
 
-func NewFraudService(e events.EventDispatcher) *GfFraudService {
+func NewFraudService(dispatcher events.EventDispatcher) *GfFraudService {
 	return &GfFraudService{
-		EventDispatcher: e,
+		EventDispatcher: dispatcher,
 	}
 }
 

@@ -1,13 +1,33 @@
 package events
 
-import "github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
+import (
+	"fmt"
+
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/messaging"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
+)
 
 type EventDispatcher interface {
 	DispatchFraudAlertEvent(transaction models.Transaction) error
 }
 
-type GfEventDispatcher struct{}
+type GfEventDispatcher struct {
+	SNSMessenger messaging.SNSMessenger
+}
 
-func (*GfEventDispatcher) DispatchFraudAlertEvent(transaction models.Transaction) error {
+func NewGfEventDispatcher(snsMessenger messaging.SNSMessenger) *GfEventDispatcher {
+	return &GfEventDispatcher{
+		SNSMessenger: snsMessenger,
+	}
+}
+
+// To be refactored later
+func (dispatcher *GfEventDispatcher) DispatchFraudAlertEvent(transaction models.Transaction) error {
+
+	_, _, err := dispatcher.SNSMessenger.PublishEmailAlert(transaction)
+	if err != nil {
+		fmt.Printf("Error sending message for transaction: %s\n", err)
+	}
+
 	return nil
 }
