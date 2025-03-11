@@ -80,6 +80,7 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 }
 
 func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
+	// Arrange
 	transactions := []models.Transaction{
 		{Email: "rshart@wisc.edu"},
 	}
@@ -141,6 +142,7 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 
 	// Assert
 	assert.Nil(suite.T(), err)
+	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
 func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
@@ -158,7 +160,7 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return(nil).Twice()
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return(nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
@@ -166,6 +168,7 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 
 	// Assert
 	assert.Nil(suite.T(), err)
+	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
 func TestPredictFraudSuite(t *testing.T) {

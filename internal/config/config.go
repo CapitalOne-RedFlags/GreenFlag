@@ -37,6 +37,10 @@ var DBConfig = &struct {
 	}
 }{}
 
+var SNSMessengerConfig = &struct {
+	TopicName string
+}{}
+
 // SQSConfig stores SQS-specific configurations
 var SQSConfig = &struct {
 	QueueURL string
@@ -120,8 +124,6 @@ func InitializeConfig() {
 		PartitionKey: "AccountID",
 		SortKey:      "TransactionID",
 	}
-	
-	SQSConfig.QueueURL = GetEnv("SQS_QUEUE_URL", "")
 }
 
 func IsCI() bool {
