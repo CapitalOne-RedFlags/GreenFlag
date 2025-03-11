@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -47,6 +48,16 @@ func UnmarshalDynamoDB(av map[string]types.AttributeValue) (*Transaction, error)
 		return nil, err
 	}
 	return &trans, nil
+}
+
+func UnmarshalSQS(trasaction string) (*Transaction, error) {
+	var result Transaction
+	err := json.Unmarshal([]byte(trasaction), &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+
 }
 
 // ValidateTransaction validates an incoming transaction.
