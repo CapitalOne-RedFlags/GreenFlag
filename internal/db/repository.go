@@ -19,7 +19,7 @@ type TransactionRepository interface {
 	DeleteTransaction(ctx context.Context, accountID, transactionID string) error
 }
 
-// ✅ Concrete Implementation of the Interface
+// Implementation of the Interface
 type DynamoTransactionRepository struct {
 	DB *DynamoDBClient
 }
