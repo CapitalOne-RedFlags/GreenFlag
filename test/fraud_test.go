@@ -146,7 +146,7 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 	// Arrange
 	testTxn1 := GetTestTransaction("test@example.com")
-	testTxn2 := GetTestTransaction("jpconnell4@wisc.eud")
+	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
 	testTxn3 := GetTestTransaction("test@example.com")
 	shouldSucceed := []models.Transaction{testTxn1, testTxn2}
 
