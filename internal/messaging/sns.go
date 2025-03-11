@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -43,35 +42,28 @@ func CreateTopic(client *sns.Client, topicName string) (string, error) {
 	return *result.TopicArn, nil
 }
 
-func (messenger *GfSNSMessenger) SendEmailAlert(transaction models.Transaction) (*sns.PublishOutput, *string, error) {
-	topicName := config.SNSMessengerConfig.TopicName
-
-	topicArn, err := CreateTopic(messenger.Client, topicName)
+func (messenger *GfSNSMessenger) SendEmailAlert(transaction models.Transaction) (*sns.PublishOutput, error) {
+	_, err := messenger.SubscribeToSNSTopic("email", transaction.Email, transaction.AccountID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create SNS topic: %s\n", err)
+		return nil, fmt.Errorf("Failed to subscribe %s SNS topic: %s\n", transaction.Email, err)
 	}
 
-	_, err = messenger.SubscribeToSNSTopic("email", transaction.Email, topicArn, transaction.AccountID)
+	publishOutput, err := messenger.PublishEmailMessage(transaction)
 	if err != nil {
-		return nil, &topicArn, fmt.Errorf("Failed to subscribe %s SNS topic: %s\n", transaction.Email, err)
+		return nil, fmt.Errorf("Failed to publish transaction with id %s SNS topic: %s\n", transaction.TransactionID, err)
 	}
 
-	publishOutput, err := messenger.PublishEmailMessage(topicArn, transaction)
-	if err != nil {
-		return nil, &topicArn, fmt.Errorf("Failed to publish transaction with id %s SNS topic: %s\n", transaction.TransactionID, err)
-	}
-
-	return publishOutput, &topicArn, nil
+	return publishOutput, nil
 }
 
-func (messenger *GfSNSMessenger) PublishEmailMessage(topicArn string, transaction models.Transaction) (*sns.PublishOutput, error) {
+func (messenger *GfSNSMessenger) PublishEmailMessage(transaction models.Transaction) (*sns.PublishOutput, error) {
 	subject, message := transaction.GetFraudEmailContent()
 	messageAttributes := GetMessageAttributes(transaction)
 
 	input := &sns.PublishInput{
 		Message:           aws.String(message),
 		Subject:           aws.String(subject),
-		TopicArn:          aws.String(topicArn),
+		TopicArn:          aws.String(messenger.TopicArn),
 		MessageAttributes: messageAttributes,
 	}
 
@@ -83,10 +75,10 @@ func (messenger *GfSNSMessenger) PublishEmailMessage(topicArn string, transactio
 	return publishOutput, nil
 }
 
-func (messenger *GfSNSMessenger) SubscribeToSNSTopic(protocol string, endpoint string, topicArn string, accountId string) (*sns.SubscribeOutput, error) {
+func (messenger *GfSNSMessenger) SubscribeToSNSTopic(protocol string, endpoint string, accountId string) (*sns.SubscribeOutput, error) {
 
 	input := &sns.SubscribeInput{
-		TopicArn: aws.String(topicArn),
+		TopicArn: aws.String(messenger.TopicArn),
 		Protocol: aws.String(protocol), // "email", "sms", "lambda", etc.
 		Endpoint: aws.String(endpoint), // email address or phone number
 	}
