@@ -1,11 +1,4 @@
-.PHONY: publish-transactions
-publish-transactions:
-	go run cmd/csv_publisher/main.go
-
-.PHONY: build-lambda
-build-lambda:
-	GOOS=linux GOARCH=amd64 go build -o bin/lambda cmd/lambda/main.go
-
-.PHONY: deploy-lambda
-deploy-lambda: build-lambda
-	sam deploy --template-file deployments/template.yaml
+fraud_pipeline:
+	GOOS=linux GOARCH=amd64 go build -tags lambda.norpc -o ./cmd/lambda/bootstrap ./cmd/lambda/fraud_pipeline.go
+	zip ./cmd/lambda/fraud_pipeline.zip ./cmd/lambda/bootstrap
+	rm -f ./cmd/lambda/bootstrap

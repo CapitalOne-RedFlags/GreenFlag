@@ -1,4 +1,4 @@
-package main
+package transactionMain
 
 import (
 	"context"
@@ -26,7 +26,9 @@ func main() {
 	repository := db.NewTransactionRepository(dbClient)
 
 	handlerWithRepo := func(ctx context.Context, event events.SQSEvent) {
-		handlers.TransactionProcessingHandler(ctx, event, repository)
+		if handlers.TransactionProcessingHandler(ctx, event, repository) != nil {
+			fmt.Printf("Error loading AWS config in lambda initialization\n%s", err)
+		}
 	}
 	lambda.Start(handlerWithRepo)
 }

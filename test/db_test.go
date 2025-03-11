@@ -23,7 +23,7 @@ import (
 type TransactionRepositoryTestSuite struct {
 	suite.Suite
 	dbClient   *db.DynamoDBClient
-	repository *db.TransactionRepository
+	repository db.TransactionRepository
 	tableName  string
 	ctx        context.Context
 }
