@@ -5,7 +5,7 @@ Description: Consumer stack for event-driven transactions, referencing an existi
 
 Globals:
   Function:
-    Runtime: provided.al2  # Updated from go1.x to provided.al2
+    Runtime: provided.al2
     MemorySize: 128
     Timeout: 10
     Architectures:
@@ -63,19 +63,17 @@ Resources:
 
   ########################################
   # (3) TransactionPipelineFunction
-  # Consumes SQS messages, writes to DynamoDB
   ########################################
   TransactionPipelineFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: TransactionPipelineFunction
-      CodeUri: build/transaction_pipeline.zip  # Ensure it matches Makefile
-      Handler: bootstrap  # Pre-compiled Go binary
+      CodeUri: .
+      Handler: bootstrap
       Runtime: provided.al2
       Environment:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
-          
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
@@ -99,20 +97,20 @@ Resources:
             Queue: !Ref TransactionQueueARN
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+    Metadata:
+      BuildMethod: makefile
 
   ########################################
   # (4) FraudPipelineFunction
-  # Triggered by DynamoDB stream, publishes to SNS
   ########################################
   FraudPipelineFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: FraudPipelineFunction
-      CodeUri: build/fraud_pipeline.zip  # Ensure it matches Makefile
-      Handler: bootstrap  # Pre-compiled Go binary
+      CodeUri: .
+      Handler: bootstrap
       Runtime: provided.al2
-
-
+      
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
@@ -128,6 +126,8 @@ Resources:
             StartingPosition: TRIM_HORIZON
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+    Metadata:
+      BuildMethod: makefile
 
 Outputs:
   DynamoDBTableNameOut:
