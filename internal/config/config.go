@@ -37,7 +37,6 @@ var DBConfig = &struct {
 	}
 }{}
 
-// Topic name for user: {TopicNamePrefix}_{AccountId}
 var SNSMessengerConfig = &struct {
 	TopicName string
 }{}
