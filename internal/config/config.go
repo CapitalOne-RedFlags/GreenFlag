@@ -37,6 +37,11 @@ var DBConfig = &struct {
 	}
 }{}
 
+// SQSConfig stores SQS-specific configurations
+var SQSConfig = &struct {
+	QueueURL string
+}{}
+
 // AWSConfig stores AWS-specific configurations
 type AWSConfig struct {
 	Region      string
@@ -115,6 +120,8 @@ func InitializeConfig() {
 		PartitionKey: "AccountID",
 		SortKey:      "TransactionID",
 	}
+	
+	SQSConfig.QueueURL = GetEnv("SQS_QUEUE_URL", "")
 }
 
 func IsCI() bool {
@@ -125,5 +132,6 @@ func PrintDBConfig() {
 	fmt.Printf("DynamoDB Table: %s\n", DBConfig.TableName)
 	fmt.Printf("DynamoDB Endpoint: %s\n", DBConfig.DynamoDBEndpoint)
 	fmt.Printf("AWS Region: %s\n", GetEnv("AWS_REGION", "us-east-1"))
+	fmt.Printf("SQS Queue URL: %s\n", SQSConfig.QueueURL)
 	fmt.Printf("CI Mode: %v\n", IsCI())
 }
