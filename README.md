@@ -17,7 +17,9 @@ This repository contains a **serverless event-driven architecture** built using 
 project-root/
 ├── cmd/
 │   └── lambda/
-│       └── main.go  # Entry point for Lambda function
+│       └── fraud/fraud_pipeline.go  # Entry point for Lambda function
+│       └── response/response_pipeline.go
+│       └── transactions/transaction_pipeline.go
 ├── internal/
 │   ├── config/
 │   │   └── config.go  # Handles app config & environment variables
@@ -70,7 +72,7 @@ handlers → services → events → messaging → db
 ```
 | **Component**            | **Depends On**                   | **Purpose** | **Example** |
 |-------------------------|--------------------------------|-------------|------------|
-| `cmd/lambda/main.go`     | `handlers/`                     | Entry point for AWS Lambda. | The `main.go` file starts the Lambda function and calls `TransactionHandler` when an event is received. |
+| `cmd/lambda/transactions/transaction_pipeline.go`     | `handlers/`                     | Entry point for AWS Lambda. | The `transaction_pipeline.go` file starts the Lambda function and calls `TransactionHandler` when an event is received. |
 | `handlers/`             | `services/`, `events/`          | Processes Lambda requests and routes them. | The `TransactionHandler` in `internal/handlers/transaction_handler.go` should receive an event from AWS Lambda (triggered by SQS or API Gateway), parse it, and pass it to `event_handlers.go` for processing. |
 | `services/`             | `events/`, `db/`, `messaging/`  | Business logic layer (transaction processing, fraud detection). | `ProcessTransaction` in `transaction_service.go` checks for fraud, stores the transaction in DynamoDB, and dispatches a `TransactionCreated` event. |
 | `events/`               | `messaging/`                    | Defines events, publishes them, and processes incoming events. | The `event_handlers.go` file routes a `TransactionCreated` event to `ProcessTransaction`, and `event_dispatcher.go` sends it to SNS or SQS via the `event_bus`. |

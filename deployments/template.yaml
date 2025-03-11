@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: Consumer stack for event-driven transactions, referencing an existing SQS queue.
+
+Globals:
+  Function:
+    Runtime: provided.al2  # Updated from go1.x to provided.al2
+    MemorySize: 128
+    Timeout: 10
+    Architectures:
+      - x86_64
+
+Parameters:
+  TransactionQueueARN:
+    Type: String
+    Description: ARN of the SQS queue holding transaction messages
+
+  DynamoDBTableName:
+    Type: String
+    Description: Name of the DynamoDB table
+    Default: Transactions
+
+  DynamoDBEndpoint:
+    Type: String
+    Description: DynamoDB endpoint (e.g., http://localhost:8000 for local tests)
+    Default: https://dynamodb.us-east-1.amazonaws.com
+
+  AWSRegion:
+    Type: String
+    Description: AWS region where resources should be deployed
+    Default: us-east-1
+
+Resources:
+  ########################################
+  # (1) DynamoDB Table
+  ########################################
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref DynamoDBTableName
+      AttributeDefinitions:
+        - AttributeName: AccountID
+          AttributeType: S
+        - AttributeName: TransactionID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: AccountID
+          KeyType: HASH
+        - AttributeName: TransactionID
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  ########################################
+  # (2) SNS Topic for Fraud Alerts
+  ########################################
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: FraudAlerts
+
+  ########################################
+  # (3) TransactionPipelineFunction
+  # Consumes SQS messages, writes to DynamoDB
+  ########################################
+  TransactionPipelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TransactionPipelineFunction
+      CodeUri: build/transaction_pipeline.zip  # Ensure it matches Makefile
+      Handler: bootstrap  # Pre-compiled Go binary
+      Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+          
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource: !Ref TransactionQueueARN
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref TransactionQueueARN
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+
+  ########################################
+  # (4) FraudPipelineFunction
+  # Triggered by DynamoDB stream, publishes to SNS
+  ########################################
+  FraudPipelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FraudPipelineFunction
+      CodeUri: build/fraud_pipeline.zip  # Ensure it matches Makefile
+      Handler: bootstrap  # Pre-compiled Go binary
+      Runtime: provided.al2
+
+
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref NotificationTopic
+      Events:
+        DynamoDBStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt TransactionsTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+
+Outputs:
+  DynamoDBTableNameOut:
+    Description: "Name of the DynamoDB table"
+    Value: !Ref TransactionsTable
+
+  NotificationTopicArn:
+    Description: "ARN of the SNS topic"
+    Value: !Ref NotificationTopic
+
+  TransactionPipelineArn:
+    Description: "ARN of the TransactionPipelineFunction"
+    Value: !GetAtt TransactionPipelineFunction.Arn
+
+  FraudPipelineArn:
+    Description: "ARN of the FraudPipelineFunction"
+    Value: !GetAtt FraudPipelineFunction.Arn
