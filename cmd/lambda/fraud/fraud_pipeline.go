@@ -25,7 +25,13 @@ func main() {
 
 	snsClient := sns.NewFromConfig(awsConfig.Config)
 
-	snsMessenger := messaging.NewGfSNSMessenger(snsClient)
+	topicName := config.SNSMessengerConfig.TopicName
+	topicArn, err := messaging.CreateTopic(snsClient, topicName)
+	if err != nil {
+		log.Fatalf("Failed to create SNS topic: %s\n", err)
+	}
+
+	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
 	fraudService := services.NewFraudService(eventDispatcher)
 	fraudHandler := handlers.NewFraudHandler(fraudService)

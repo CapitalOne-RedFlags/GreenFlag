@@ -24,7 +24,7 @@ func NewGfEventDispatcher(snsMessenger messaging.SNSMessenger) *GfEventDispatche
 // To be refactored later
 func (dispatcher *GfEventDispatcher) DispatchFraudAlertEvent(transaction models.Transaction) error {
 
-	_, _, err := dispatcher.SNSMessenger.PublishEmailAlert(transaction)
+	_, _, err := dispatcher.SNSMessenger.SendEmailAlert(transaction)
 	if err != nil {
 		fmt.Printf("Error sending message for transaction: %s\n", err)
 	}

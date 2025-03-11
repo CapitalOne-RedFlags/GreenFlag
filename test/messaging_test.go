@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"log"
-	"sync"
 	"testing"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
@@ -17,8 +16,7 @@ type SNSMessagingTestSuite struct {
 	suite.Suite
 	snsMessenger *messaging.GfSNSMessenger
 	ctx          context.Context
-	topicArns    []string
-	arnLock      sync.Mutex
+	topicArn     string
 }
 
 func TestSNSMessagingSuite(t *testing.T) {
@@ -39,45 +37,37 @@ func (s *SNSMessagingTestSuite) SetupSuite() {
 		log.Fatal("Failed to create SNS Client!\n", err)
 	}
 
-	s.snsMessenger = messaging.NewGfSNSMessenger(client)
+	topicName := config.SNSMessengerConfig.TopicName
+
+	topicArn, err := messaging.CreateTopic(client, topicName)
+	if err != nil {
+		log.Fatalf("Failed to create SNS Topic: %s\n", err)
+	}
+	s.topicArn = topicArn
+
+	s.snsMessenger = messaging.NewGfSNSMessenger(client, config.SNSMessengerConfig.TopicName, topicArn)
 }
 
-func (s *SNSMessagingTestSuite) TestPublishEmailAlert() {
+func (s *SNSMessagingTestSuite) TestSendEmailAlert() {
 	// Arrange
-	txn := GetTestTransaction("jalarsen5@wisc.edu")
+	txn := GetTestTransaction("c1redflagstest@gmail.com")
 
 	// Act
-	output, topicArn, err := s.snsMessenger.PublishEmailAlert(txn)
+	output, topicArn, err := s.snsMessenger.SendEmailAlert(txn)
 
 	// Assert
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), topicArn)
-
-	addTopicArnToTeardown(s, topicArn)
-
 	assert.NotNil(s.T(), output)
 }
 
 func (s *SNSMessagingTestSuite) TearDownSuite() {
-	s.arnLock.Lock()
-
-	for _, topicArn := range s.topicArns {
-		deleteTopicInput := &sns.DeleteTopicInput{
-			TopicArn: &topicArn,
-		}
-
-		_, err := s.snsMessenger.Client.DeleteTopic(context.TODO(), deleteTopicInput)
-		if err != nil {
-			log.Fatalf("Failed to delete SNS Topic: %s\n", err)
-		}
+	input := &sns.DeleteTopicInput{
+		TopicArn: &s.topicArn,
 	}
 
-	s.arnLock.Unlock()
-}
-
-// Call when a topic arn is created in a test method
-func addTopicArnToTeardown(s *SNSMessagingTestSuite, topicArn *string) {
-	s.arnLock.Lock()
-	defer s.arnLock.Unlock()
-	s.topicArns = append(s.topicArns, *topicArn)
+	_, err := s.snsMessenger.Client.DeleteTopic(context.TODO(), input)
+	if err != nil {
+		log.Fatalf("Failed to delete topic: %s\n", err)
+	}
 }

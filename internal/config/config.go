@@ -39,7 +39,7 @@ var DBConfig = &struct {
 
 // Topic name for user: {TopicNamePrefix}_{AccountId}
 var SNSMessengerConfig = &struct {
-	TopicNamePrefix string
+	TopicName string
 }{}
 
 // AWSConfig stores AWS-specific configurations
@@ -121,7 +121,7 @@ func InitializeConfig() {
 		SortKey:      "TransactionID",
 	}
 
-	SNSMessengerConfig.TopicNamePrefix = GetEnv("SNS_TOPIC_PREFIX", "FraudAlerts")
+	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")
 }
 
 func IsCI() bool {

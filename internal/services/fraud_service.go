@@ -53,5 +53,5 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm
 func predictFraud(transaction models.Transaction) (bool, error) {
-	return slices.Contains([]string{"rshart@wisc.edu", "jpconnell4@wisc.eud"}, transaction.Email), nil
+	return slices.Contains([]string{"rshart@wisc.edu", "jpconnell4@wisc.eud", "c1redflagstest@gmail.com"}, transaction.Email), nil
 }
