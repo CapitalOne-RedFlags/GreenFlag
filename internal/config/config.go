@@ -119,8 +119,6 @@ func InitializeConfig() {
 		"TransactionDuration":     true,
 		"LoginAttempts":           true,
 		"AccountBalance":          true,
-		"PreviousTransactionDate": true,
-		"PhoneNumber":             true,
 		"Email":                   true,
 	}
 	DBConfig.UpdateCondition = "TransactionStatus = Pending"
