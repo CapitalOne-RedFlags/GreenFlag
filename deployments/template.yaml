@@ -117,6 +117,7 @@ Resources:
             - Effect: Allow
               Action:
                 - sns:CreateTopic
+                - sns:Subscribe
                 - sns:Publish
               Resource: !Ref NotificationTopic
       Events:
