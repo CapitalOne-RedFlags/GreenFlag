@@ -49,14 +49,7 @@ func main() {
 
 	// Create SQS client
 	sqsClient := sqs.NewFromConfig(cfg)
-	queueURL := os.Getenv("QUEUE_URL")
-	if queueURL == "" {
-		queueURL = internalConfig.SQSConfig.QueueURL // Fallback to config
-		log.Printf("Using queue URL from config: %s", queueURL)
-	} else {
-		log.Printf("Using queue URL from environment: %s", queueURL)
-	}
-	sqsHandler := messaging.NewSQSHandler(sqsClient, queueURL)
+	sqsHandler := messaging.NewSQSHandler(sqsClient, internalConfig.SQSConfig.QueueURL)
 
 	// CSV file path from environment variable or default
 	csvFilePath := os.Getenv("CSV_FILE_PATH")
@@ -139,31 +132,10 @@ func main() {
 		// Add to current batch
 		currentBatch = append(currentBatch, transaction)
 		
-		// When batch is full, send it
-		if len(currentBatch) >= batchSize {
-			processBatch(context.TODO(), &wg, sqsHandler, currentBatch, currentIndex-len(currentBatch)+1)
-			
-			// Update state after successful batch processing
-			state.LastProcessedIndex = currentIndex
-			if err := saveState(state, statePath); err != nil {
-				log.Printf("Error saving state: %v", err)
-			}
-			
-			batchCount++
-			totalSent += len(currentBatch)
-			log.Printf("Queued batch %d with %d transactions (up to index %d)", 
-				batchCount, len(currentBatch), currentIndex)
-			
-			// Reset for next batch
-			currentBatch = []models.Transaction{}
-		}
-	}
-	
-	// Send any remaining transactions
-	if len(currentBatch) > 0 {
+		// Process just one transaction and then break
 		processBatch(context.TODO(), &wg, sqsHandler, currentBatch, currentIndex-len(currentBatch)+1)
 		
-		// Update state after final batch
+		// Update state after successful batch processing
 		state.LastProcessedIndex = currentIndex
 		if err := saveState(state, statePath); err != nil {
 			log.Printf("Error saving state: %v", err)
@@ -171,8 +143,11 @@ func main() {
 		
 		batchCount++
 		totalSent += len(currentBatch)
-		log.Printf("Queued final batch %d with %d transactions (up to index %d)", 
+		log.Printf("Queued batch %d with %d transactions (up to index %d)", 
 			batchCount, len(currentBatch), currentIndex)
+		
+		// Break after processing one transaction
+		break
 	}
 	
 	// Wait for all batches to complete
@@ -245,32 +220,32 @@ func saveState(state *ProcessingState, statePath string) error {
 // parseTransaction converts a CSV record to a Transaction using column map
 func parseTransaction(record []string, colMap map[string]int) (models.Transaction, error) {
 	// Parse numeric fields
-	customerAge, _ := strconv.Atoi(record[colMap["CustomerAge"]])
-	transactionDuration, _ := strconv.Atoi(record[colMap["TransactionDuration"]])
-	loginAttempts, _ := strconv.Atoi(record[colMap["LoginAttempts"]])
-	accountBalance, _ := strconv.ParseFloat(record[colMap["AccountBalance"]], 64)
-	amount, _ := strconv.ParseFloat(record[colMap["TransactionAmount"]], 64)
+	customerAge, _ := strconv.Atoi(record[colMap["customerAge"]])
+	transactionDuration, _ := strconv.Atoi(record[colMap["transactionDuration"]])
+	loginAttempts, _ := strconv.Atoi(record[colMap["loginAttempts"]])
+	accountBalance, _ := strconv.ParseFloat(record[colMap["accountBalance"]], 64)
+	amount, _ := strconv.ParseFloat(record[colMap["transactionAmount"]], 64)
 
 	transaction := models.Transaction{
-		TransactionID:          record[colMap["TransactionID"]],
-		AccountID:              record[colMap["AccountID"]],
+		TransactionID:          record[colMap["transactionId"]],
+		AccountID:              record[colMap["accountId"]],
 		TransactionAmount:      amount,
-		TransactionDate:        record[colMap["TransactionDate"]],
-		TransactionType:        record[colMap["TransactionType"]],
-		Location:               record[colMap["Location"]],
-		DeviceID:               record[colMap["DeviceID"]],
-		IPAddress:              record[colMap["IPAddress"]],
-		MerchantID:             record[colMap["MerchantID"]],
-		Channel:                record[colMap["Channel"]],
+		TransactionDate:        record[colMap["transactionDate"]],
+		TransactionType:        record[colMap["transactionType"]],
+		Location:               record[colMap["location"]],
+		DeviceID:               record[colMap["deviceId"]],
+		IPAddress:              record[colMap["ipAddress"]],
+		MerchantID:             record[colMap["merchantId"]],
+		Channel:                record[colMap["channel"]],
 		CustomerAge:            customerAge,
-		CustomerOccupation:     record[colMap["CustomerOccupation"]],
+		CustomerOccupation:     record[colMap["customerOccupation"]],
 		TransactionDuration:    transactionDuration,
 		LoginAttempts:          loginAttempts,
 		AccountBalance:         accountBalance,
-		PreviousTransactionDate: record[colMap["PreviousTransactionDate"]],
-		PhoneNumber:            record[colMap["PhoneNumber"]],
-		Email:                  record[colMap["Email"]],
-		TransactionStatus:      record[colMap["TransactionStatus"]],
+		PreviousTransactionDate: record[colMap["previousTransactionDate"]],
+		PhoneNumber:            record[colMap["phoneNumber"]],
+		Email:                  record[colMap["email"]],
+		TransactionStatus:      record[colMap["transactionStatus"]],
 	}
 
 	return transaction, nil
@@ -301,4 +276,40 @@ func processBatch(ctx context.Context, wg *sync.WaitGroup, sqsHandler *messaging
 		duration := time.Since(startTime)
 		log.Printf("Batch completed: %d/%d successful in %v", successCount, len(b), duration)
 	}(batch)
+}
+
+// Helper functions for parsing and formatting
+func parseFloat(s string) float64 {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+	return f
+}
+
+func parseInt(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return i
+}
+
+func formatDate(s string) string {
+	// Parse the date from the CSV format (e.g., "4:29:00 PM")
+	// and convert it to ISO 8601 format (e.g., "2025-03-11T10:12:34Z")
+	// This will depend on your actual date format in the CSV
+	
+	// Example implementation (adjust based on your actual date format):
+	t, err := time.Parse("3:04:05 PM", s)
+	if err != nil {
+		// If parsing fails, use current time
+		t = time.Now()
+	}
+	
+	// Set the date to today (since your CSV might only have time)
+	now := time.Now()
+	t = time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
+	
+	return t.Format(time.RFC3339)
 } 
