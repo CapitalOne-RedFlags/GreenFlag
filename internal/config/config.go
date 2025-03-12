@@ -14,9 +14,16 @@ import (
 
 // LoadEnv loads environment variables from a .env file
 func LoadEnv() {
-	err := godotenv.Load("../.env")
+	// Try multiple possible locations for .env file
+	err := godotenv.Load()  // Try current directory
 	if err != nil {
-		log.Println("Warning: No .env file found or failed to load.")
+		err = godotenv.Load("../.env")  // Try parent directory
+		if err != nil {
+			err = godotenv.Load("../../.env")  // Try project root
+			if err != nil {
+				log.Println("Warning: No .env file found or failed to load.")
+			}
+		}
 	}
 
 	// log.Printf("DEBUG: AWS_ACCESS_KEY_ID=%s\n", os.Getenv("AWS_ACCESS_KEY_ID"))
@@ -39,6 +46,11 @@ var DBConfig = &struct {
 
 var SNSMessengerConfig = &struct {
 	TopicName string
+}{}
+
+// SQSConfig stores SQS-specific configurations
+var SQSConfig = &struct {
+	QueueURL string
 }{}
 
 // AWSConfig stores AWS-specific configurations
@@ -120,7 +132,17 @@ func InitializeConfig() {
 		SortKey:      "TransactionID",
 	}
 
+	// Initialize SQS config
+	SQSConfig.QueueURL = GetEnv("QUEUE_URL", "")
+
+	// Initialize SNS config
 	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")
+
+	log.Printf("DynamoDB Table: %s", DBConfig.TableName)
+	log.Printf("DynamoDB Endpoint: %s", DBConfig.DynamoDBEndpoint)
+	log.Printf("AWS Region: %s", GetEnv("AWS_REGION", "us-east-1"))
+	log.Printf("SQS Queue URL: %s", SQSConfig.QueueURL)
+	log.Printf("CI Mode: %s", GetEnv("CI", "false"))
 }
 
 func IsCI() bool {
@@ -131,5 +153,6 @@ func PrintDBConfig() {
 	fmt.Printf("DynamoDB Table: %s\n", DBConfig.TableName)
 	fmt.Printf("DynamoDB Endpoint: %s\n", DBConfig.DynamoDBEndpoint)
 	fmt.Printf("AWS Region: %s\n", GetEnv("AWS_REGION", "us-east-1"))
+	fmt.Printf("SQS Queue URL: %s\n", SQSConfig.QueueURL)
 	fmt.Printf("CI Mode: %v\n", IsCI())
 }
