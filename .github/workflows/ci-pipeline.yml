@@ -30,6 +30,7 @@ jobs:
     env:
       DYNAMODB_TABLE_NAME: TestTransactions
       DYNAMODB_ENDPOINT: http://localhost:8000
+      SNS_TOPIC: ${{ secrets.SNS_TOPIC }}
       ci: true
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
