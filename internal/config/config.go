@@ -119,6 +119,8 @@ func InitializeConfig() {
 		"TransactionDuration":     true,
 		"LoginAttempts":           true,
 		"AccountBalance":          true,
+		"PreviousTransactionDate": true,
+		"PhoneNumber":             true,
 		"Email":                   true,
 	}
 	DBConfig.UpdateCondition = "TransactionStatus = Pending"
@@ -129,6 +131,18 @@ func InitializeConfig() {
 		PartitionKey: "AccountID",
 		SortKey:      "TransactionID",
 	}
+
+	// Initialize SQS config
+	SQSConfig.QueueURL = GetEnv("QUEUE_URL", "")
+
+	// Initialize SNS config
+	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")
+
+	log.Printf("DynamoDB Table: %s", DBConfig.TableName)
+	log.Printf("DynamoDB Endpoint: %s", DBConfig.DynamoDBEndpoint)
+	log.Printf("AWS Region: %s", GetEnv("AWS_REGION", "us-east-1"))
+	log.Printf("SQS Queue URL: %s", SQSConfig.QueueURL)
+	log.Printf("CI Mode: %s", GetEnv("CI", "false"))
 }
 
 func IsCI() bool {
