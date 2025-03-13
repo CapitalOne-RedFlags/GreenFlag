@@ -26,8 +26,9 @@ func main() {
 	repository := db.NewTransactionRepository(dbClient)
 
 	handlerWithRepo := func(ctx context.Context, event events.SQSEvent) {
-		if handlers.TransactionProcessingHandler(ctx, event, repository) != nil {
-			fmt.Printf("Error initializing transaction processing handler\n%s", err)
+		tpErr := handlers.TransactionProcessingHandler(ctx, event, repository)
+		if tpErr != nil {
+			fmt.Printf("Error initializing transaction processing handler:\n%s", tpErr)
 		}
 	}
 	lambda.Start(handlerWithRepo)
