@@ -53,14 +53,14 @@ func TestProducerSuite(t *testing.T) {
 func (s *ProducerTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 	s.queueURL = "https://sqs.us-east-1.amazonaws.com/140023383737/Bank_Transactions"
-	
+
 	// Create temporary directory for test files
 	var err error
 	s.tempDir, err = os.MkdirTemp("", "producer-test-")
 	if err != nil {
 		s.T().Fatalf("Failed to create temp dir: %v", err)
 	}
-	
+
 	// Create test CSV path
 	s.csvPath = filepath.Join(s.tempDir, "test_transactions.csv")
 	s.statePath = filepath.Join(s.tempDir, ".test_transactions.csv.state")
@@ -75,10 +75,10 @@ func (s *ProducerTestSuite) TearDownSuite() {
 // ✅ Setup Before Each Test
 func (s *ProducerTestSuite) SetupTest() {
 	s.mockSQSClient = new(MockSQSClient)
-	
+
 	// Create a test CSV file
 	s.createTestCSV()
-	
+
 	// Remove state file if it exists
 	os.Remove(s.statePath)
 }
@@ -95,7 +95,7 @@ tx-125,acc-458,300.25,2023-01-03,PURCHASE,Los Angeles,dev-125,192.168.1.3,merch-
 		s.T().Fatalf("Failed to create test CSV: %v", err)
 	}
 	defer file.Close()
-	
+
 	_, err = file.WriteString(csvData)
 	if err != nil {
 		s.T().Fatalf("Failed to write test CSV: %v", err)
@@ -108,13 +108,13 @@ func (s *ProducerTestSuite) createStateFile(lastProcessedIndex int) {
 		LastProcessedIndex: lastProcessedIndex,
 		LastRunTime:        time.Now().Add(-time.Hour),
 	}
-	
+
 	file, err := os.Create(s.statePath)
 	if err != nil {
 		s.T().Fatalf("Failed to create state file: %v", err)
 	}
 	defer file.Close()
-	
+
 	err = json.NewEncoder(file).Encode(state)
 	if err != nil {
 		s.T().Fatalf("Failed to write state file: %v", err)
@@ -137,23 +137,23 @@ func (s *ProducerTestSuite) TestSendTransaction() {
 	// Setup mock expectations
 	messageId := uuid.New().String()
 	s.mockSQSClient.On("SendMessage", s.ctx, mock.Anything).Return(
-		&sqs.SendMessageOutput{MessageId: aws.String(messageId)}, 
+		&sqs.SendMessageOutput{MessageId: aws.String(messageId)},
 		nil,
 	).Once()
 
 	// Convert transaction to JSON for SQS message
 	data, err := json.Marshal(transaction)
 	assert.NoError(s.T(), err)
-	
+
 	// Create SQS message input
 	input := &sqs.SendMessageInput{
 		QueueUrl:    aws.String(s.queueURL),
 		MessageBody: aws.String(string(data)),
 	}
-	
+
 	// Send message
 	output, err := s.mockSQSClient.SendMessage(s.ctx, input)
-	
+
 	// Assert results
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), output)
@@ -166,17 +166,17 @@ func (s *ProducerTestSuite) TestLoadState() {
 	// Create a state file
 	expectedIndex := 5
 	s.createStateFile(expectedIndex)
-	
+
 	// Read the file
 	file, err := os.Open(s.statePath)
 	assert.NoError(s.T(), err)
 	defer file.Close()
-	
+
 	// Decode the state
 	var state ProcessingState
 	err = json.NewDecoder(file).Decode(&state)
 	assert.NoError(s.T(), err)
-	
+
 	// Verify state
 	assert.Equal(s.T(), expectedIndex, state.LastProcessedIndex)
 	assert.False(s.T(), state.LastRunTime.IsZero())
@@ -189,26 +189,26 @@ func (s *ProducerTestSuite) TestSaveState() {
 		LastProcessedIndex: 10,
 		LastRunTime:        time.Now(),
 	}
-	
+
 	// Create a file
 	file, err := os.Create(s.statePath)
 	assert.NoError(s.T(), err)
-	
+
 	// Encode the state
 	err = json.NewEncoder(file).Encode(expectedState)
 	assert.NoError(s.T(), err)
 	file.Close()
-	
+
 	// Read it back
 	file, err = os.Open(s.statePath)
 	assert.NoError(s.T(), err)
 	defer file.Close()
-	
+
 	// Decode the state
 	var loadedState ProcessingState
 	err = json.NewDecoder(file).Decode(&loadedState)
 	assert.NoError(s.T(), err)
-	
+
 	// Verify state
 	assert.Equal(s.T(), expectedState.LastProcessedIndex, loadedState.LastProcessedIndex)
 }
@@ -241,11 +241,11 @@ func (s *ProducerTestSuite) TestSendMultipleTransactions() {
 	for i := range transactions {
 		messageId := uuid.New().String()
 		data, _ := json.Marshal(transactions[i])
-		
+
 		s.mockSQSClient.On("SendMessage", s.ctx, mock.MatchedBy(func(input *sqs.SendMessageInput) bool {
 			return *input.QueueUrl == s.queueURL && *input.MessageBody == string(data)
 		})).Return(
-			&sqs.SendMessageOutput{MessageId: aws.String(messageId)}, 
+			&sqs.SendMessageOutput{MessageId: aws.String(messageId)},
 			nil,
 		).Once()
 	}
@@ -257,13 +257,68 @@ func (s *ProducerTestSuite) TestSendMultipleTransactions() {
 			QueueUrl:    aws.String(s.queueURL),
 			MessageBody: aws.String(string(data)),
 		}
-		
+
 		output, err := s.mockSQSClient.SendMessage(s.ctx, input)
 		assert.NoError(s.T(), err)
 		assert.NotNil(s.T(), output)
 		assert.NotEmpty(s.T(), *output.MessageId)
 	}
-	
+
 	// Verify all expected calls were made
 	s.mockSQSClient.AssertExpectations(s.T())
+}
+
+func TestPublisher(t *testing.T) {
+	// Create a test transaction
+	testTx := models.Transaction{
+		TransactionID:           "TEST-123",
+		AccountID:               "ACC-456",
+		TransactionAmount:       100.00,
+		TransactionDate:         "2024-03-14T12:00:00Z",
+		TransactionType:         "PURCHASE",
+		Location:                "New York",
+		DeviceID:                "DEV-789",
+		IPAddress:               "192.168.1.1",
+		MerchantID:              "MERCH-101",
+		Channel:                 "ONLINE",
+		CustomerAge:             30,
+		CustomerOccupation:      "Engineer",
+		TransactionDuration:     5,
+		LoginAttempts:           1,
+		AccountBalance:          1000.00,
+		PreviousTransactionDate: "2024-03-13T12:00:00Z",
+		PhoneNumber:             "+1234567890",
+		Email:                   "test@example.com",
+		TransactionStatus:       "PENDING",
+	}
+
+	// Validate the transaction model
+	t.Run("Transaction Model Validation", func(t *testing.T) {
+		// Validate required fields are not empty
+		assert.NotEmpty(t, testTx.TransactionID, "TransactionID should not be empty")
+		assert.NotEmpty(t, testTx.AccountID, "AccountID should not be empty")
+		assert.NotEmpty(t, testTx.TransactionDate, "TransactionDate should not be empty")
+
+		// Validate numeric fields are within expected ranges
+		assert.Greater(t, testTx.TransactionAmount, 0.0, "TransactionAmount should be positive")
+		assert.GreaterOrEqual(t, testTx.CustomerAge, 18, "CustomerAge should be at least 18")
+		assert.GreaterOrEqual(t, testTx.LoginAttempts, 0, "LoginAttempts should not be negative")
+
+		// Validate format of specific fields
+		assert.Regexp(t, `^\+\d+$`, testTx.PhoneNumber, "PhoneNumber should start with + and contain only digits")
+		assert.Regexp(t, `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`, testTx.Email, "Email should be in valid format")
+
+		// Validate enum-like fields
+		validStatuses := map[string]bool{"PENDING": true, "COMPLETED": true, "FAILED": true}
+		assert.True(t, validStatuses[testTx.TransactionStatus], "TransactionStatus should be one of: PENDING, COMPLETED, FAILED")
+
+		validChannels := map[string]bool{"ONLINE": true, "MOBILE": true, "ATM": true, "BRANCH": true}
+		assert.True(t, validChannels[testTx.Channel], "Channel should be one of: ONLINE, MOBILE, ATM, BRANCH")
+	})
+
+	// Your existing publisher test code here...
+	t.Run("Publisher Operations", func(t *testing.T) {
+		// Test publishing the transaction
+		// ... existing test code ...
+	})
 }

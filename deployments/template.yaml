@@ -34,7 +34,7 @@ Parameters:
   QueueUrl:
     Type: String
     Description: URL of the SQS queue
-    Default: https://sqs.us-east-1.amazonaws.com/140023383737/TestTransactionsQueue
+    Default: https://sqs.us-east-1.amazonaws.com/140023383737/Bank_Transactions
 
 Resources:
   ########################################

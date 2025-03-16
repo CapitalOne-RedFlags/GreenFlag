@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
+	"regexp"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -13,25 +13,26 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const projectDirName = "GreenFlag" // Your project name
+
 // LoadEnv loads environment variables from a .env file
 func LoadEnv() {
-	// Get home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Println("Warning: Could not determine home directory:", err)
-	}
+	// Find project root directory dynamically
+	projectName := regexp.MustCompile(`^(.*` + projectDirName + `)`)
+	currentWorkDirectory, _ := os.Getwd()
+	rootPath := projectName.Find([]byte(currentWorkDirectory))
 
-	// Try to load from ~/GreenFlag/.env
-	envPath := filepath.Join(homeDir, "GreenFlag", ".env")
-	if err := godotenv.Load(envPath); err == nil {
-		log.Printf("Loaded environment from %s", envPath)
-	} else {
-		log.Printf("Warning: Could not load .env file from %s: %v", envPath, err)
+	// Try to load .env from project root
+	err := godotenv.Load(string(rootPath) + `/.env`)
+	if err != nil {
+		log.Printf("Warning: Could not load .env file from project root: %v", err)
 
 		// Fallback to current directory
 		if err := godotenv.Load(); err != nil {
-			log.Println("Warning: No .env file found or failed to load.")
+			log.Println("Warning: No .env file found in current directory")
 		}
+	} else {
+		log.Printf("Loaded environment from %s/.env", string(rootPath))
 	}
 
 	// Print environment variables for debugging
