@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -14,22 +15,30 @@ import (
 
 // LoadEnv loads environment variables from a .env file
 func LoadEnv() {
-	// Try multiple possible locations for .env file
-	err := godotenv.Load()  // Try current directory
+	// Get home directory
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		err = godotenv.Load("../.env")  // Try parent directory
-		if err != nil {
-			err = godotenv.Load("../../.env")  // Try project root
-			if err != nil {
-				log.Println("Warning: No .env file found or failed to load.")
-			}
+		log.Println("Warning: Could not determine home directory:", err)
+	}
+
+	// Try to load from ~/GreenFlag/.env
+	envPath := filepath.Join(homeDir, "GreenFlag", ".env")
+	if err := godotenv.Load(envPath); err == nil {
+		log.Printf("Loaded environment from %s", envPath)
+	} else {
+		log.Printf("Warning: Could not load .env file from %s: %v", envPath, err)
+
+		// Fallback to current directory
+		if err := godotenv.Load(); err != nil {
+			log.Println("Warning: No .env file found or failed to load.")
 		}
 	}
 
-	// log.Printf("DEBUG: AWS_ACCESS_KEY_ID=%s\n", os.Getenv("AWS_ACCESS_KEY_ID"))
-	// log.Printf("DEBUG: AWS_SECRET_ACCESS_KEY=%s\n", os.Getenv("AWS_SECRET_ACCESS_KEY"))
-	// log.Printf("DEBUG: AWS_SESSION_TOKEN=%s\n", os.Getenv("AWS_SESSION_TOKEN")) // Optional
-	// log.Printf("DEBUG: AWS_REGION=%s\n", os.Getenv("AWS_REGION"))
+	// Print environment variables for debugging
+	log.Printf("AWS Region: %s", GetEnv("AWS_REGION", "us-east-1"))
+	log.Printf("SQS Queue URL: %s", GetEnv("SQS_QUEUE_URL", ""))
+	log.Printf("DynamoDB Table: %s", GetEnv("DYNAMODB_TABLE", "Transactions"))
+	log.Printf("DynamoDB Endpoint: %s", GetEnv("DYNAMODB_ENDPOINT", ""))
 }
 
 // DBConfig stores table settings

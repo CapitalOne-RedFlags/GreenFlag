@@ -3,10 +3,11 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"log"
 
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
 
 type SQSHandler struct {
@@ -27,6 +28,9 @@ func (h *SQSHandler) SendTransaction(ctx context.Context, transaction *models.Tr
 	if err != nil {
 		return err
 	}
+
+	// Log the JSON data being sent to SQS
+	log.Printf("Sending transaction to SQS: %s", string(jsonData))
 
 	_, err = h.client.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:    aws.String(h.queueURL),

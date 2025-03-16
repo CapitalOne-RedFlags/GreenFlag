@@ -15,25 +15,25 @@ import (
 
 // Transaction represents a record in DynamoDB.
 type Transaction struct {
-	TransactionID           string  `dynamodbav:"TransactionID" validate:"required"`
-	AccountID               string  `dynamodbav:"AccountID" validate:"required"`
-	TransactionAmount       float64 `dynamodbav:"TransactionAmount" validate:"gte=0"`
-	TransactionDate         string  `dynamodbav:"TransactionDate"`
-	TransactionType         string  `dynamodbav:"TransactionType"`
-	Location                string  `dynamodbav:"Location"`
-	DeviceID                string  `dynamodbav:"DeviceID"`
-	IPAddress               string  `dynamodbav:"IPAddress"`
-	MerchantID              string  `dynamodbav:"MerchantID"`
-	Channel                 string  `dynamodbav:"Channel"`
-	CustomerAge             int     `dynamodbav:"CustomerAge" validate:"gte=18"`
-	CustomerOccupation      string  `dynamodbav:"CustomerOccupation"`
-	TransactionDuration     int     `dynamodbav:"TransactionDuration"`
-	LoginAttempts           int     `dynamodbav:"LoginAttempts"`
-	AccountBalance          float64 `dynamodbav:"AccountBalance"`
-	PreviousTransactionDate string  `dynamodbav:"PreviousTransactionDate"`
-	PhoneNumber             string  `dynamodbav:"PhoneNumber" validate:"required,e164"`
-	Email                   string  `dynamodbav:"Email" validate:"required,email"`
-	TransactionStatus       string  `dynamodbav:"TransactionStatus"`
+	TransactionID           string  `json:"transactionId" dynamodbav:"TransactionID" validate:"required"`
+	AccountID               string  `json:"accountId" dynamodbav:"AccountID" validate:"required"`
+	TransactionAmount       float64 `json:"amount" dynamodbav:"TransactionAmount" validate:"gte=0"`
+	TransactionDate         string  `json:"transactionDate" dynamodbav:"TransactionDate"`
+	TransactionType         string  `json:"transactionType" dynamodbav:"TransactionType"`
+	Location                string  `json:"location" dynamodbav:"Location"`
+	DeviceID                string  `json:"deviceId" dynamodbav:"DeviceID"`
+	IPAddress               string  `json:"ipAddress" dynamodbav:"IPAddress"`
+	MerchantID              string  `json:"merchantId" dynamodbav:"MerchantID"`
+	Channel                 string  `json:"channel" dynamodbav:"Channel"`
+	CustomerAge             int     `json:"customerAge" dynamodbav:"CustomerAge" validate:"gte=18"`
+	CustomerOccupation      string  `json:"customerOccupation" dynamodbav:"CustomerOccupation"`
+	TransactionDuration     int     `json:"transactionDuration" dynamodbav:"TransactionDuration"`
+	LoginAttempts           int     `json:"loginAttempts" dynamodbav:"LoginAttempts"`
+	AccountBalance          float64 `json:"accountBalance" dynamodbav:"AccountBalance"`
+	PreviousTransactionDate string  `json:"previousTransactionDate" dynamodbav:"PreviousTransactionDate"`
+	PhoneNumber             string  `json:"phoneNumber" dynamodbav:"PhoneNumber" validate:"required,e164"`
+	Email                   string  `json:"email" dynamodbav:"Email" validate:"required,email"`
+	TransactionStatus       string  `json:"transactionStatus" dynamodbav:"TransactionStatus"`
 }
 
 // MarshalDynamoDB marshals a Transaction into a DynamoDB attribute map.
