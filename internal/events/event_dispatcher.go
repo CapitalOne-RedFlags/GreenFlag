@@ -28,6 +28,7 @@ func (dispatcher *GfEventDispatcher) DispatchFraudAlertEvent(transaction models.
 	if err != nil {
 		return fmt.Errorf("Error sending message for transaction: %s\n", err)
 	}
+	fmt.Printf("Fraud detected, successfully sent email to %s\n", transaction.Email)
 
 	return nil
 }
