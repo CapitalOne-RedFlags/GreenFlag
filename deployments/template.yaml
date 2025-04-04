@@ -31,6 +31,11 @@ Parameters:
     Description: AWS region where resources should be deployed
     Default: us-east-1
 
+  QueueUrl:
+    Type: String
+    Description: URL of the SQS queue
+    Default: https://sqs.us-east-1.amazonaws.com/140023383737/Bank_Transactions
+
 Resources:
   ########################################
   # (1) DynamoDB Table
@@ -116,6 +121,8 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - sns:CreateTopic
+                - sns:Subscribe
                 - sns:Publish
               Resource: !Ref NotificationTopic
       Events:
