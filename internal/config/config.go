@@ -2,18 +2,26 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"regexp"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/joho/godotenv"
 )
 
 const projectDirName = "GreenFlag" // Your project name
+
+type TwilioSecrets struct {
+	Username string `json:"TWILIO_USERNAME"`
+	Password string `json:"TWILIO_PASSWORD"`
+}
 
 // LoadEnv loads environment variables from a .env file
 func LoadEnv() {
@@ -55,7 +63,9 @@ var DBConfig = &struct {
 }{}
 
 var SNSMessengerConfig = &struct {
-	TopicName string
+	TopicName      string
+	TwilioUsername string
+	TwilioPassword string
 }{}
 
 // SQSConfig stores SQS-specific configurations
@@ -147,12 +157,20 @@ func InitializeConfig() {
 
 	// Initialize SNS config
 	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")
+	secrets, err := LoadTwilioSecrets("greenflags/twilio")
+	if err != nil {
+		log.Printf("error loading Twilio secrets:", err)
+	} else {
+		SNSMessengerConfig.TwilioUsername = secrets.Username
+		SNSMessengerConfig.TwilioPassword = secrets.Password
+	}
 
 	log.Printf("DynamoDB Table: %s", DBConfig.TableName)
 	log.Printf("DynamoDB Endpoint: %s", DBConfig.DynamoDBEndpoint)
 	log.Printf("AWS Region: %s", GetEnv("AWS_REGION", "us-east-1"))
 	log.Printf("SQS Queue URL: %s", SQSConfig.QueueURL)
 	log.Printf("CI Mode: %s", GetEnv("CI", "false"))
+
 }
 
 func IsCI() bool {
@@ -165,4 +183,32 @@ func PrintDBConfig() {
 	fmt.Printf("AWS Region: %s\n", GetEnv("AWS_REGION", "us-east-1"))
 	fmt.Printf("SQS Queue URL: %s\n", SQSConfig.QueueURL)
 	fmt.Printf("CI Mode: %v\n", IsCI())
+}
+
+func LoadTwilioSecrets(secretName string) (*TwilioSecrets, error) {
+	region := "us-east-1"
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	if err != nil {
+		return nil, fmt.Errorf("unable to load AWS config: %w", err)
+	}
+
+	svc := secretsmanager.NewFromConfig(cfg)
+
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId:     aws.String(secretName),
+		VersionStage: aws.String("AWSCURRENT"), // default stage
+	}
+
+	result, err := svc.GetSecretValue(context.TODO(), input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve secret: %w", err)
+	}
+
+	var twilio TwilioSecrets
+	if err := json.Unmarshal([]byte(*result.SecretString), &twilio); err != nil {
+		return nil, fmt.Errorf("failed to parse secret JSON: %w", err)
+	}
+
+	return &twilio, nil
 }

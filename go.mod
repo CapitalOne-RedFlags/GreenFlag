@@ -9,11 +9,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.62
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.7
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.41.1
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.3
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.38.1
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.10.0
+	github.com/twilio/twilio-go v1.25.1
+
 )
 
 require (
@@ -27,8 +30,12 @@ require (
 	github.com/aws/smithy-go v1.22.3 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/twilio/twilio-go v1.25.1 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 )
 
@@ -45,5 +52,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.34 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.10.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.34.2
 )

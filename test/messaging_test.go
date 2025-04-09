@@ -38,6 +38,8 @@ func (s *SNSMessagingTestSuite) SetupSuite() {
 	}
 
 	topicName := config.SNSMessengerConfig.TopicName
+	twilioUsername := config.SNSMessengerConfig.TwilioUsername
+	twilioPassword := config.SNSMessengerConfig.TwilioPassword
 
 	topicArn, err := messaging.CreateTopic(client, topicName)
 	if err != nil {
@@ -45,7 +47,7 @@ func (s *SNSMessagingTestSuite) SetupSuite() {
 	}
 	s.topicArn = topicArn
 
-	s.snsMessenger = messaging.NewGfSNSMessenger(client, config.SNSMessengerConfig.TopicName, topicArn)
+	s.snsMessenger = messaging.NewGfSNSMessenger(client, config.SNSMessengerConfig.TopicName, topicArn, twilioUsername, twilioPassword)
 }
 
 func (s *SNSMessagingTestSuite) TestSendEmailAlert() {

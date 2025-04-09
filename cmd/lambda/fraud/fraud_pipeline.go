@@ -26,12 +26,14 @@ func main() {
 	snsClient := sns.NewFromConfig(awsConfig.Config)
 
 	topicName := config.SNSMessengerConfig.TopicName
+	twilioUsername := config.SNSMessengerConfig.TwilioUsername
+	twiilioPassword := config.SNSMessengerConfig.TwilioPassword
 	topicArn, err := messaging.CreateTopic(snsClient, topicName)
 	if err != nil {
 		log.Fatalf("Failed to create SNS topic: %s\n", err)
 	}
 
-	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn)
+	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twiilioPassword)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
 	fraudService := services.NewFraudService(eventDispatcher)
 	fraudHandler := handlers.NewFraudHandler(fraudService)

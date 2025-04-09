@@ -95,6 +95,10 @@ Resources:
                 - sqs:DeleteMessage
                 - sqs:GetQueueAttributes
               Resource: !Ref TransactionQueueARN
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
       Events:
         SQSEvent:
           Type: SQS
@@ -125,6 +129,10 @@ Resources:
                 - sns:Subscribe
                 - sns:Publish
               Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
       Events:
         DynamoDBStream:
           Type: DynamoDB
@@ -152,3 +160,45 @@ Outputs:
   FraudPipelineArn:
     Description: "ARN of the FraudPipelineFunction"
     Value: !GetAtt FraudPipelineFunction.Arn
+
+  # ########################################
+  # # (5) SQS Queue and ResponsePipelineFunction
+  # ########################################
+
+  # SQSQueue1:
+  #   Type: AWS::SQS::Queue
+  #   Properties:
+  #     QueueName: SQSQueue1
+  #     SqsManagedSseEnabled: true
+
+  # ResponsePipelineFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     FunctionName: ResponsePipelineFunction
+  #     CodeUri: ../
+  #     Handler: bootstrap 
+  #     Runtime: provided.al2
+  #     Architectures:
+  #       - x86_64
+  #     MemorySize: 128
+  #     Timeout: 3
+  #     EphemeralStorage:
+  #       Size: 512
+  #     Environment:
+  #       Variables:
+  #         QUEUE_NAME: !Ref SQSQueue1
+  #     Policies:
+  #       - AWSLambdaBasicExecutionRole
+  #       - Statement:
+  #           - Effect: Allow
+  #             Action:
+  #               - sqs:ReceiveMessage
+  #               - sqs:DeleteMessage
+  #               - sqs:GetQueueAttributes
+  #             Resource: !GetAtt SQSQueue1.Arn
+  #     Events:
+  #       SQS1:
+  #         Type: SQS
+  #         Properties:
+  #           Queue: !GetAtt SQSQueue1.Arn
+  #           BatchSize: 10

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
@@ -15,6 +16,7 @@ func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, re
 	for _, record := range event.Records {
 		result, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
+			fmt.Printf("error Unmarshalling: %s", err)
 			return err
 		}
 		transactions = append(transactions, *result)
