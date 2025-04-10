@@ -53,6 +53,8 @@ Resources:
           AttributeType: S
         - AttributeName: TransactionID
           AttributeType: S
+        - AttributeName: PhoneNumber   # ADD THIS
+          AttributeType: S
       KeySchema:
         - AttributeName: AccountID
           KeyType: HASH
@@ -61,6 +63,13 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
+      GlobalSecondaryIndexes:
+        - IndexName: PhoneNumberIndex
+          KeySchema:
+            - AttributeName: PhoneNumber
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   ########################################
   # (2) SNS Topic for Fraud Alerts
@@ -123,10 +132,20 @@ Resources:
       CodeUri: ../
       Handler: bootstrap
       Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
       
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
             - Effect: Allow
               Action:
                 - sns:CreateTopic
@@ -158,6 +177,9 @@ Resources:
       CodeUri: ../
       Handler: bootstrap 
       Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
       EphemeralStorage:
         Size: 512
 
@@ -166,10 +188,32 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+                - dynamodb:Query 
+              Resource: 
+                - !GetAtt TransactionsTable.Arn
+                - !Sub "${TransactionsTable.Arn}/index/PhoneNumberIndex"
+
+            - Effect: Allow
+              Action:
                 - sqs:ReceiveMessage
                 - sqs:DeleteMessage
                 - sqs:GetQueueAttributes
+                - sqs:SendMessage
               Resource: !Ref ResponseQueueArn
+            - Effect: Allow
+              Action:
+                - sns:CreateTopic
+                - sns:Subscribe
+                - sns:Publish
+              Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
       Events:
         SQSEvent:
           Type: SQS

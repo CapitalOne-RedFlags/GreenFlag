@@ -61,7 +61,7 @@ deploy: sam-build
 
 # Use sam sync for iterative deployments during development
 .PHONY: sync
-sync:
+sync: sam-build
 	sam sync --stack-name $(STACK_NAME) --watch -t $(TEMPLATE_FILE) --profile $(PROFILE)
 
 # Clean up: Delete the CloudFormation stack and remove build artifacts

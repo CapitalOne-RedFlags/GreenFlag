@@ -4,9 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -15,7 +20,9 @@ import (
 type TransactionRepository interface {
 	SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error)
 	GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error)
+	GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error)
 	UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error)
+	UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error
 	DeleteTransaction(ctx context.Context, accountID, transactionID string) error
 }
 
@@ -47,6 +54,44 @@ func (r *DynamoTransactionRepository) SaveTransaction(ctx context.Context, t *mo
 
 	fmt.Printf("Transaction saved: %s | Metadata: %s\n", t.TransactionID, metadata)
 	return output, metadata, nil
+}
+
+func (r *DynamoTransactionRepository) GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error) {
+	var transactions []models.Transaction
+	keyEx := expression.Key("PhoneNumber").Equal(expression.Value(phoneNumber))
+	filterEx := expression.Name("TransactionStatus").Equal((expression.Value("POTENTIAL_FRAUD")))
+	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).WithFilter(filterEx).Build()
+	if err != nil {
+		fmt.Printf("Couldn't build expression for query. Here's why: %v\n", err)
+		return nil, err
+	} else {
+		queryPaginator := dynamodb.NewQueryPaginator(r.DB.Client, &dynamodb.QueryInput{
+			TableName:                 aws.String(r.DB.TableName),
+			IndexName:                 aws.String("PhoneNumberIndex"),
+			KeyConditionExpression:    expr.KeyCondition(),
+			FilterExpression:          expr.Filter(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+		})
+		for queryPaginator.HasMorePages() {
+			response, err := queryPaginator.NextPage(ctx)
+			if err != nil {
+				fmt.Printf("Error getting transactions: %s", err)
+				return nil, err
+
+			} else {
+				var transactionsPage []models.Transaction
+				err = attributevalue.UnmarshalListOfMaps(response.Items, &transactionsPage)
+				if err != nil {
+					fmt.Printf("Couldn't unmarshal query response. Here's why: %v\n", err)
+					return nil, err
+				} else {
+					transactions = append(transactions, transactionsPage...)
+				}
+			}
+		}
+	}
+	return transactions, nil
 }
 
 // GetTransaction retrieves a transaction by AccountID and TransactionID
@@ -111,6 +156,7 @@ func (r *DynamoTransactionRepository) UpdateTransaction(ctx context.Context, acc
 	// Call DynamoDB update function with key
 	result, err := r.DB.UpdateItem(ctx, key, updates)
 	if err != nil {
+		fmt.Printf("Error updating transaction, %s", err)
 		return nil, err
 	}
 
@@ -142,4 +188,54 @@ func (r *DynamoTransactionRepository) DeleteTransaction(ctx context.Context, acc
 
 	fmt.Printf("Transaction deleted: %s\n", transactionID)
 	return nil
+}
+
+func (r *DynamoTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error {
+	potentialFrauds, err := r.GetFraudTransaction(ctx, phoneNumber)
+	if err != nil {
+		return err
+	}
+	if len(potentialFrauds) == 0 {
+		return errors.New("No Potential frauds for number: " + phoneNumber)
+	}
+
+	var wg sync.WaitGroup
+	errorResults := make(chan error, len(potentialFrauds))
+	for _, msg := range potentialFrauds {
+		wg.Add(1)
+		go func(txn models.Transaction) {
+
+			defer wg.Done()
+
+			if isFraud {
+				txn.TransactionStatus = "FRAUD"
+				_, err := r.UpdateTransaction(
+					ctx,
+					txn.AccountID,
+					txn.TransactionID,
+					&txn,
+				)
+				if err != nil {
+					fmt.Printf("Error updating transaction with phone number: %s to fraud. Error: %s", phoneNumber, err)
+					errorResults <- err
+				}
+
+			} else {
+				txn.TransactionStatus = "APPROVED"
+				_, err := r.UpdateTransaction(
+					ctx,
+					txn.AccountID,
+					txn.TransactionID,
+					&txn,
+				)
+				if err != nil {
+					fmt.Printf("Error updating transaction with phone number: %s to Approved. Error: %s", phoneNumber, err)
+					errorResults <- err
+				}
+			}
+		}(msg)
+	}
+	wg.Wait()
+	close(errorResults)
+	return middleware.MergeErrors(errorResults)
 }

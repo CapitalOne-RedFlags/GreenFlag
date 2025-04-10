@@ -16,6 +16,7 @@ import (
 type SNSMessenger interface {
 	SendEmailAlert(transaction models.Transaction) (*sns.PublishOutput, error)
 	SendTextAlert(transaction models.Transaction) error
+	SendTextUpdate(number string, body string) error
 }
 
 type GfSNSMessenger struct {
@@ -158,6 +159,27 @@ func (messenger *GfSNSMessenger) SendTextAlert(transaction models.Transaction) e
 	//ASSIGNED TWILIO PHONE NUMBER
 	params.SetFrom("+18333981458")
 	number := transaction.PhoneNumber
+	params.SetTo(number)
+
+	_, err := client.Api.CreateMessage(params)
+	if err != nil {
+		fmt.Println(err.Error())
+		return err
+	}
+	return nil
+}
+
+func (messenger *GfSNSMessenger) SendTextUpdate(number string, body string) error {
+	client := twilio.NewRestClientWithParams(twilio.ClientParams{
+		Username: messenger.TwilioUsername,
+		Password: messenger.TwilioPassword,
+	})
+
+	params := &api.CreateMessageParams{}
+	params.SetBody(body)
+
+	//ASSIGNED TWILIO PHONE NUMBER
+	params.SetFrom("+18333981458")
 	params.SetTo(number)
 
 	_, err := client.Api.CreateMessage(params)

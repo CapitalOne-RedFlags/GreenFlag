@@ -44,7 +44,7 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 		transactions = append(transactions, *transaction)
 	}
 
-	return fh.FraudService.PredictFraud(transactions)
+	return fh.FraudService.PredictFraud(ctx, transactions)
 }
 
 // Converts AWS Lambda event DynamoDBAttributeValue to AWS SDK v2 AttributeValue
