@@ -16,6 +16,10 @@ Parameters:
     Type: String
     Description: ARN of the SQS queue holding transaction messages
 
+  ResponseQueueArn:
+    Type: String
+    Description: ARN of the SQS queue holding response messages
+
   DynamoDBTableName:
     Type: String
     Description: Name of the DynamoDB table
@@ -143,6 +147,40 @@ Resources:
             MaximumBatchingWindowInSeconds: 5
     Metadata:
       BuildMethod: makefile
+  # ########################################
+  # # (5) SQS Queue and ResponsePipelineFunction
+  # ########################################
+
+  ResponsePipelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ResponsePipelineFunction
+      CodeUri: ../
+      Handler: bootstrap 
+      Runtime: provided.al2
+      EphemeralStorage:
+        Size: 512
+
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource: !Ref ResponseQueueArn
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref ResponseQueueArn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+    Metadata:
+      BuildMethod: makefile
+  
+
 
 Outputs:
   DynamoDBTableNameOut:
@@ -161,44 +199,6 @@ Outputs:
     Description: "ARN of the FraudPipelineFunction"
     Value: !GetAtt FraudPipelineFunction.Arn
 
-  # ########################################
-  # # (5) SQS Queue and ResponsePipelineFunction
-  # ########################################
-
-  # SQSQueue1:
-  #   Type: AWS::SQS::Queue
-  #   Properties:
-  #     QueueName: SQSQueue1
-  #     SqsManagedSseEnabled: true
-
-  # ResponsePipelineFunction:
-  #   Type: AWS::Serverless::Function
-  #   Properties:
-  #     FunctionName: ResponsePipelineFunction
-  #     CodeUri: ../
-  #     Handler: bootstrap 
-  #     Runtime: provided.al2
-  #     Architectures:
-  #       - x86_64
-  #     MemorySize: 128
-  #     Timeout: 3
-  #     EphemeralStorage:
-  #       Size: 512
-  #     Environment:
-  #       Variables:
-  #         QUEUE_NAME: !Ref SQSQueue1
-  #     Policies:
-  #       - AWSLambdaBasicExecutionRole
-  #       - Statement:
-  #           - Effect: Allow
-  #             Action:
-  #               - sqs:ReceiveMessage
-  #               - sqs:DeleteMessage
-  #               - sqs:GetQueueAttributes
-  #             Resource: !GetAtt SQSQueue1.Arn
-  #     Events:
-  #       SQS1:
-  #         Type: SQS
-  #         Properties:
-  #           Queue: !GetAtt SQSQueue1.Arn
-  #           BatchSize: 10
+  ResponsePipelineArn:
+    Description: "ARN of the ResponsePipelineFunction"
+    Value: !GetAtt ResponsePipelineFunction.Arn

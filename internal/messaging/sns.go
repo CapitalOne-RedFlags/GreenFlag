@@ -157,7 +157,7 @@ func (messenger *GfSNSMessenger) SendTextAlert(transaction models.Transaction) e
 
 	//ASSIGNED TWILIO PHONE NUMBER
 	params.SetFrom("+18333981458")
-	number := "+" + transaction.PhoneNumber
+	number := transaction.PhoneNumber
 	params.SetTo(number)
 
 	_, err := client.Api.CreateMessage(params)
