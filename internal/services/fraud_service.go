@@ -11,7 +11,7 @@ import (
 )
 
 type FraudService interface {
-	PredictFraud(transactions []models.Transaction) error
+	PredictFraud(transactions []models.Transaction) ([]models.Transaction, error)
 }
 
 type GfFraudService struct {
@@ -24,9 +24,10 @@ func NewFraudService(dispatcher events.EventDispatcher) *GfFraudService {
 	}
 }
 
-func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error {
+func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
+	fraudResults := make(chan models.Transaction, len(transactions))
 
 	for _, txn := range transactions {
 		wg.Add(1)
@@ -35,9 +36,11 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 			isFraud, err := predictFraud(txn)
 			if err != nil {
 				errorResults <- err
+				return
 			}
 
 			if isFraud {
+				fraudResults <- txn
 				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
 				if err != nil {
 					errorResults <- err
@@ -47,12 +50,19 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 	}
 	wg.Wait()
 	close(errorResults)
+	close(fraudResults)
 
-	return middleware.MergeErrors(errorResults)
+	// Collect fraud transactions
+	var fraudulentTransactions []models.Transaction
+	for txn := range fraudResults {
+		fraudulentTransactions = append(fraudulentTransactions, txn)
+	}
+
+	return fraudulentTransactions, middleware.MergeErrors(errorResults)
 }
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm
 func predictFraud(transaction models.Transaction) (bool, error) {
-	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu", "c1redflagstest@gmail.com", "wlee298@wisc.edu", "donglaiduann@gmail.com" }, transaction.Email), nil
+	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu", "c1redflagstest@gmail.com", "wlee298@wisc.edu", "donglaiduann@gmail.com"}, transaction.Email), nil
 
 }

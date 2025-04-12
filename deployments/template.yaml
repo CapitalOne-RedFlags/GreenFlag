@@ -10,6 +10,7 @@ Globals:
     Timeout: 10
     Architectures:
       - x86_64
+    Tracing: Active
 
 Parameters:
   TransactionQueueARN:
@@ -81,6 +82,7 @@ Resources:
           DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
         - Statement:
             - Effect: Allow
               Action:
@@ -118,6 +120,7 @@ Resources:
       
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
         - Statement:
             - Effect: Allow
               Action:
