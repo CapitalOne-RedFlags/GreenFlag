@@ -8,6 +8,7 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/google/uuid"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
@@ -20,6 +21,48 @@ type MockEventDispatcher struct {
 	mock.Mock
 }
 
+// DeleteTransaction implements db.TransactionRepository.
+func (m *MockEventDispatcher) DeleteTransaction(ctx context.Context, accountID string, transactionID string) error {
+	args := m.Called(ctx, accountID, transactionID)
+	return args.Error(0)
+}
+
+// GetFraudTransaction implements db.TransactionRepository.
+func (m *MockEventDispatcher) GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error) {
+	args := m.Called(ctx, phoneNumber)
+	return nil, args.Error(1)
+}
+
+// GetTransaction implements db.TransactionRepository.
+func (m *MockEventDispatcher) GetTransaction(ctx context.Context, accountID string, transactionID string) (*models.Transaction, error) {
+	args := m.Called(ctx, accountID, transactionID)
+	return nil, args.Error(1)
+}
+
+// SaveTransaction implements db.TransactionRepository.
+func (m *MockEventDispatcher) SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error) {
+	args := m.Called(ctx, t)
+	return nil, "", args.Error(1)
+}
+
+// UpdateFraudTransaction implements db.TransactionRepository.
+func (m *MockEventDispatcher) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error {
+	args := m.Called(ctx, phoneNumber, isFraud)
+	return args.Error(0)
+}
+
+// UpdateTransaction implements db.TransactionRepository.
+func (m *MockEventDispatcher) UpdateTransaction(ctx context.Context, accountID string, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error) {
+	args := m.Called(ctx, accountID, transactionID, values)
+	return nil, args.Error(1)
+}
+
+// DispatchFraudUpdateEvent implements events.EventDispatcher.
+func (m *MockEventDispatcher) DispatchFraudUpdateEvent(number string, body string) error {
+	args := m.Called(number, body)
+	return args.Error(0)
+}
+
 type MockFraudService struct {
 	mock.Mock
 }
@@ -29,15 +72,16 @@ func (m *MockEventDispatcher) DispatchFraudAlertEvent(txn models.Transaction) er
 	return args.Error(0)
 }
 
-func (m *MockFraudService) PredictFraud(transactions []models.Transaction) error {
+func (m *MockFraudService) PredictFraud(ctx context.Context, transactions []models.Transaction) error {
 	args := m.Called(transactions)
 	return args.Error(0)
 }
 
 type PredictFraudTestSuite struct {
 	suite.Suite
-	mockEventDispatcher *MockEventDispatcher
-	mockFraudService    *MockFraudService
+	mockEventDispatcher       *MockEventDispatcher
+	mockFraudService          *MockFraudService
+	mockTransactionRepository *MockTransactionRepository
 }
 
 func (suite *PredictFraudTestSuite) SetupTest() {
@@ -47,32 +91,34 @@ func (suite *PredictFraudTestSuite) SetupTest() {
 
 // Fraud Service Tests
 func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
+	ctx := context.Background()
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "safeuser@example.com"},
-		{Email: "anotheruser@example.com"},
+		{Email: "safeuser@example.com", AccountID: "1", TransactionID: "1"},
+		{Email: "anotheruser@example.com", AccountID: "2", TransactionID: "2"},
 	}
 
-	fraudService := services.NewFraudService(suite.mockEventDispatcher)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	err := fraudService.PredictFraud(ctx, transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error for non-fraud transactions")
 }
 
 func (suite *PredictFraudTestSuite) TestFraudDetected() {
+	ctx := context.Background()
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "rshart@wisc.edu"},
+		{Email: "rshart@wisc.edu", AccountID: "1", TransactionID: "1"},
 	}
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[0]).Return(nil).Once()
-	fraudService := services.NewFraudService(suite.mockEventDispatcher)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	err := fraudService.PredictFraud(ctx, transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error when fraud alert is successfully dispatched")
@@ -80,16 +126,17 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 }
 
 func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
+	ctx := context.Background()
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "rshart@wisc.edu"},
+		{Email: "rshart@wisc.edu", AccountID: "1", TransactionID: "1"},
 	}
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[0]).Return(errors.New("dispatch error")).Once()
-	fraudService := services.NewFraudService(suite.mockEventDispatcher)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	err := fraudService.PredictFraud(ctx, transactions)
 
 	// Assert
 	assert.Error(suite.T(), err, "Should return an error when fraud alert dispatch fails")
@@ -97,19 +144,20 @@ func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
 }
 
 func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
+	ctx := context.Background()
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "jalarsen5@wisc.edu"},
-		{Email: "rshart@wisc.edu"},
-		{Email: "jpoconnell4@wisc.edu"},
+		{Email: "jalarsen5@wisc.edu", AccountID: "1", TransactionID: "1"},
+		{Email: "rshart@wisc.edu", AccountID: "2", TransactionID: "2"},
+		{Email: "jpoconnell4@wisc.edu", AccountID: "3", TransactionID: "3"},
 	}
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[1]).Return(nil).Once()
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[2]).Return(nil).Once()
-	fraudService := services.NewFraudService(suite.mockEventDispatcher)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	err := fraudService.PredictFraud(ctx, transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return error for multiple transactions")

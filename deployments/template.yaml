@@ -53,7 +53,7 @@ Resources:
           AttributeType: S
         - AttributeName: TransactionID
           AttributeType: S
-        - AttributeName: PhoneNumber   # ADD THIS
+        - AttributeName: PhoneNumber
           AttributeType: S
       KeySchema:
         - AttributeName: AccountID
