@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -12,17 +13,33 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const projectDirName = "GreenFlag" // Your project name
+
 // LoadEnv loads environment variables from a .env file
 func LoadEnv() {
-	err := godotenv.Load("../.env")
+	// Find project root directory dynamically
+	projectName := regexp.MustCompile(`^(.*` + projectDirName + `)`)
+	currentWorkDirectory, _ := os.Getwd()
+	rootPath := projectName.Find([]byte(currentWorkDirectory))
+
+	// Try to load .env from project root
+	err := godotenv.Load(string(rootPath) + `/.env`)
 	if err != nil {
-		log.Println("Warning: No .env file found or failed to load.")
+		log.Printf("Warning: Could not load .env file from project root: %v", err)
+
+		// Fallback to current directory
+		if err := godotenv.Load(); err != nil {
+			log.Println("Warning: No .env file found in current directory")
+		}
+	} else {
+		log.Printf("Loaded environment from %s/.env", string(rootPath))
 	}
 
-	// log.Printf("DEBUG: AWS_ACCESS_KEY_ID=%s\n", os.Getenv("AWS_ACCESS_KEY_ID"))
-	// log.Printf("DEBUG: AWS_SECRET_ACCESS_KEY=%s\n", os.Getenv("AWS_SECRET_ACCESS_KEY"))
-	// log.Printf("DEBUG: AWS_SESSION_TOKEN=%s\n", os.Getenv("AWS_SESSION_TOKEN")) // Optional
-	// log.Printf("DEBUG: AWS_REGION=%s\n", os.Getenv("AWS_REGION"))
+	// Print environment variables for debugging
+	log.Printf("AWS Region: %s", GetEnv("AWS_REGION", "us-east-1"))
+	log.Printf("SQS Queue URL: %s", GetEnv("SQS_QUEUE_URL", ""))
+	log.Printf("DynamoDB Table: %s", GetEnv("DYNAMODB_TABLE", "Transactions"))
+	log.Printf("DynamoDB Endpoint: %s", GetEnv("DYNAMODB_ENDPOINT", ""))
 }
 
 // DBConfig stores table settings
@@ -39,6 +56,11 @@ var DBConfig = &struct {
 
 var SNSMessengerConfig = &struct {
 	TopicName string
+}{}
+
+// SQSConfig stores SQS-specific configurations
+var SQSConfig = &struct {
+	QueueURL string
 }{}
 
 // AWSConfig stores AWS-specific configurations
@@ -120,7 +142,17 @@ func InitializeConfig() {
 		SortKey:      "TransactionID",
 	}
 
+	// Initialize SQS config
+	SQSConfig.QueueURL = GetEnv("QUEUE_URL", "")
+
+	// Initialize SNS config
 	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")
+
+	log.Printf("DynamoDB Table: %s", DBConfig.TableName)
+	log.Printf("DynamoDB Endpoint: %s", DBConfig.DynamoDBEndpoint)
+	log.Printf("AWS Region: %s", GetEnv("AWS_REGION", "us-east-1"))
+	log.Printf("SQS Queue URL: %s", SQSConfig.QueueURL)
+	log.Printf("CI Mode: %s", GetEnv("CI", "false"))
 }
 
 func IsCI() bool {
@@ -131,5 +163,6 @@ func PrintDBConfig() {
 	fmt.Printf("DynamoDB Table: %s\n", DBConfig.TableName)
 	fmt.Printf("DynamoDB Endpoint: %s\n", DBConfig.DynamoDBEndpoint)
 	fmt.Printf("AWS Region: %s\n", GetEnv("AWS_REGION", "us-east-1"))
+	fmt.Printf("SQS Queue URL: %s\n", SQSConfig.QueueURL)
 	fmt.Printf("CI Mode: %v\n", IsCI())
 }
