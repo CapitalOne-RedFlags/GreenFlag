@@ -16,9 +16,9 @@ func CreateModel(client *frauddetector.Client) {
 	description := "Fraud detection model"
 
 	_, err := client.PutModel(context.TODO(), &frauddetector.PutModelInput{
-		ModelId:      aws.String(modelID),
-		ModelType:    frauddetector.ModelType(modelType),
-		Description:  aws.String(description),
+		ModelId:       aws.String(modelID),
+		ModelType:     frauddetector.ModelType(modelType),
+		Description:   aws.String(description),
 		EventTypeName: aws.String("transaction_event"),
 	})
 	if err != nil {

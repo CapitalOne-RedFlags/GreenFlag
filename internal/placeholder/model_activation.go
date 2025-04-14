@@ -15,10 +15,10 @@ func ActivateModel(client *frauddetector.Client) {
 	modelVersion := "1.0"
 
 	_, err := client.UpdateModelVersionStatus(context.TODO(), &frauddetector.UpdateModelVersionStatusInput{
-		ModelId:        aws.String(modelID),
-		ModelType:      frauddetector.ModelTypeOnlineFraudInsights,
+		ModelId:            aws.String(modelID),
+		ModelType:          frauddetector.ModelTypeOnlineFraudInsights,
 		ModelVersionNumber: aws.String(modelVersion),
-		Status:        frauddetector.ModelVersionStatusActive,
+		Status:             frauddetector.ModelVersionStatusActive,
 	})
 	if err != nil {
 		log.Fatalf("Failed to activate model: %v", err)

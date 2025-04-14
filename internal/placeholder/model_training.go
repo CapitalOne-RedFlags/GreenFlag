@@ -14,8 +14,8 @@ func TrainModel(client *frauddetector.Client) {
 	modelID := "fraud_model"
 
 	_, err := client.CreateModelVersion(context.TODO(), &frauddetector.CreateModelVersionInput{
-		ModelId:           aws.String(modelID),
-		ModelType:         frauddetector.ModelTypeOnlineFraudInsights,
+		ModelId:            aws.String(modelID),
+		ModelType:          frauddetector.ModelTypeOnlineFraudInsights,
 		TrainingDataSource: aws.String("S3"),
 		TrainingDataSchema: &frauddetector.TrainingDataSchema{
 			TargetAttributeName: aws.String("IS_FRAUD"),
