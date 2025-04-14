@@ -15,7 +15,7 @@ FRAUD_SRC=$(ROOT_DIR)/cmd/lambda/fraud
 TRANSACTION_FUNCTION=TransactionPipelineFunction
 FRAUD_FUNCTION=FraudPipelineFunction
 STACK_NAME=TransactionConsumerStack
-PROFILE=AdministratorAccess-140023383737
+PROFILE=CS620_C1_Capstone_Rex
 TEMPLATE_FILE=$(ROOT_DIR)/deployments/template.yaml
 
 
