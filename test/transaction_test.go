@@ -22,13 +22,13 @@ type MockTransactionRepository struct {
 }
 
 // GetFraudTransaction implements db.TransactionRepository.
-func (m *MockTransactionRepository) GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error) {
+func (m *MockTransactionRepository) GetTransactionByNumberAndStatus(ctx context.Context, phoneNumber string, status string) ([]models.Transaction, error) {
 	args := m.Called(ctx, phoneNumber)
 	return nil, args.Error(1)
 }
 
 // UpdateFraudTransaction implements db.TransactionRepository.
-func (m *MockTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error {
+func (m *MockTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error {
 	args := m.Called(ctx, phoneNumber, isFraud)
 	return args.Error(0)
 }

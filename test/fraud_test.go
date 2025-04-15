@@ -28,8 +28,8 @@ func (m *MockEventDispatcher) DeleteTransaction(ctx context.Context, accountID s
 }
 
 // GetFraudTransaction implements db.TransactionRepository.
-func (m *MockEventDispatcher) GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error) {
-	args := m.Called(ctx, phoneNumber)
+func (m *MockEventDispatcher) GetTransactionByNumberAndStatus(ctx context.Context, phoneNumber string, status string) ([]models.Transaction, error) {
+	args := m.Called(ctx, phoneNumber, status)
 	return nil, args.Error(1)
 }
 
@@ -46,8 +46,8 @@ func (m *MockEventDispatcher) SaveTransaction(ctx context.Context, t *models.Tra
 }
 
 // UpdateFraudTransaction implements db.TransactionRepository.
-func (m *MockEventDispatcher) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error {
-	args := m.Called(ctx, phoneNumber, isFraud)
+func (m *MockEventDispatcher) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error {
+	args := m.Called(ctx, phoneNumber, isFraud, status)
 	return args.Error(0)
 }
 

@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 type TwilioMessage struct {
@@ -35,4 +36,8 @@ func UnmarshalResponseSQS(message string) (*TwilioMessage, error) {
 	}
 	return &result, nil
 
+}
+
+func (msg TwilioMessage) ParseUserResponse() string {
+	return strings.ToUpper(strings.TrimSpace(msg.Body))
 }

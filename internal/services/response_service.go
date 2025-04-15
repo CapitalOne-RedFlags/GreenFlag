@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
@@ -21,6 +20,12 @@ type GfResponseService struct {
 	TransactionRepo db.TransactionRepository
 }
 
+const (
+	ResponseFraudConfirmed  = "Thank you for your response. We have canceled this transaction. Your balance will be updated accordingly."
+	ResponseFraudRejected   = "Thank you for your response. We have updated this transaction status to valid. Your balance will be updated accordingly."
+	ResponseInvalidResponse = "Please reply YES if this was you or NO if it was not."
+)
+
 func NewGfResponseService(dispatcher events.EventDispatcher, repo db.TransactionRepository) *GfResponseService {
 	return &GfResponseService{
 		EventDispatcher: dispatcher,
@@ -36,33 +41,31 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 		wg.Add(1)
 		go func(msg models.TwilioMessage) {
 			defer wg.Done()
-			if strings.ToUpper(strings.TrimSpace(msg.Body)) == "NO" {
-				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, true)
+			if msg.ParseUserResponse() == "NO" {
+				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, true, "POTENTIAL_FRAUD")
 				if err != nil {
 					fmt.Printf("Error updating fraud transaction: %s", err)
 					errorResults <- err
 				}
-				body := "Thank you for your response. We have canceled this transaction. Your balance will be updated accordingly"
-				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudConfirmed)
 				if err != nil {
 					fmt.Printf("Error dispatching fraud event: %s", err)
 					errorResults <- err
 				}
-			} else if strings.ToUpper(strings.TrimSpace(msg.Body)) == "YES" {
-				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, false)
+			} else if msg.ParseUserResponse() == "YES" {
+				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, false, "POTENTIAL_FRAUD")
 				if err != nil {
 					fmt.Printf("Error updating fraud transaction: %s", err)
 					errorResults <- err
 				}
-				body := "Thank you for your response. We have updated this trascation status to valid. Your balance will be updated accordingly"
-				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+
+				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudRejected)
 				if err != nil {
 					fmt.Printf("Error dispatching fraud event: %s", err)
 					errorResults <- err
 				}
 			} else {
-				body := "Please reply YES if this was you or NO if it was not"
-				err := rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				err := rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseInvalidResponse)
 				if err != nil {
 					fmt.Printf("Error dispatching fraud event: %s", err)
 					errorResults <- err

@@ -20,9 +20,9 @@ import (
 type TransactionRepository interface {
 	SaveTransaction(ctx context.Context, t *models.Transaction) (*dynamodb.PutItemOutput, string, error)
 	GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error)
-	GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error)
+	GetTransactionByNumberAndStatus(ctx context.Context, phoneNumber string, status string) ([]models.Transaction, error)
 	UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error)
-	UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error
+	UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error
 	DeleteTransaction(ctx context.Context, accountID, transactionID string) error
 }
 
@@ -56,10 +56,10 @@ func (r *DynamoTransactionRepository) SaveTransaction(ctx context.Context, t *mo
 	return output, metadata, nil
 }
 
-func (r *DynamoTransactionRepository) GetFraudTransaction(ctx context.Context, phoneNumber string) ([]models.Transaction, error) {
+func (r *DynamoTransactionRepository) GetTransactionByNumberAndStatus(ctx context.Context, phoneNumber string, status string) ([]models.Transaction, error) {
 	var transactions []models.Transaction
 	keyEx := expression.Key("PhoneNumber").Equal(expression.Value(phoneNumber))
-	filterEx := expression.Name("TransactionStatus").Equal((expression.Value("POTENTIAL_FRAUD")))
+	filterEx := expression.Name("TransactionStatus").Equal((expression.Value(status)))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).WithFilter(filterEx).Build()
 	if err != nil {
 		fmt.Printf("Couldn't build expression for query. Here's why: %v\n", err)
@@ -190,13 +190,10 @@ func (r *DynamoTransactionRepository) DeleteTransaction(ctx context.Context, acc
 	return nil
 }
 
-func (r *DynamoTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool) error {
-	potentialFrauds, err := r.GetFraudTransaction(ctx, phoneNumber)
+func (r *DynamoTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error {
+	potentialFrauds, err := r.GetTransactionByNumberAndStatus(ctx, phoneNumber, status)
 	if err != nil {
 		return err
-	}
-	if len(potentialFrauds) == 0 {
-		return errors.New("No Potential frauds for number: " + phoneNumber)
 	}
 
 	var wg sync.WaitGroup
