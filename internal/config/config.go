@@ -159,7 +159,7 @@ func InitializeConfig() {
 	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")
 	secrets, err := LoadTwilioSecrets("greenflags/twilio")
 	if err != nil {
-		log.Printf("error loading Twilio secrets:", err)
+		log.Printf("error loading Twilio secrets: %s", err)
 	} else {
 		SNSMessengerConfig.TwilioUsername = secrets.Username
 		SNSMessengerConfig.TwilioPassword = secrets.Password
