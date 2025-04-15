@@ -61,7 +61,6 @@ var SNSMessengerConfig = &struct {
 // SQSConfig stores SQS-specific configurations
 var SQSConfig = &struct {
 	QueueURL string
-	FraudDLQArn string
 }{}
 
 var HandlerConfig = &struct {
@@ -149,7 +148,6 @@ func InitializeConfig() {
 
 	// Initialize SQS config
 	SQSConfig.QueueURL = GetEnv("QUEUE_URL", "")
-	SQSConfig.FraudDLQURL = GetEnv("FRAUD_DLQ_URL", "")
 
 	// Initialize SNS config
 	SNSMessengerConfig.TopicName = GetEnv("SNS_TOPIC", "FraudAlerts")

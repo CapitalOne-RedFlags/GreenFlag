@@ -106,6 +106,8 @@ Resources:
             Queue: !Ref TransactionQueueARN
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
     Metadata:
       BuildMethod: makefile
 
@@ -143,6 +145,8 @@ Resources:
             StartingPosition: TRIM_HORIZON
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
       DeadLetterQueue:
         Type: SQS
         TargetArn: !Ref TransactionDLQARN
@@ -202,6 +206,8 @@ Resources:
             Queue: !Ref TransactionDLQARN
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
     Metadata:
       BuildMethod: makefile
 

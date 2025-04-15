@@ -7,7 +7,7 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
-	"github.com/aws/aws-lambda-go/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
@@ -24,12 +24,7 @@ func main() {
 	tableName := config.DBConfig.TableName
 	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConf.Config), tableName)
 	repository := db.NewTransactionRepository(dbClient)
-
-	handlerWithRepo := func(ctx context.Context, event events.SQSEvent) {
-		tpErr := handlers.TransactionProcessingHandler(ctx, event, repository)
-		if tpErr != nil {
-			fmt.Printf("Error initializing transaction processing handler:\n%s", tpErr)
-		}
-	}
-	lambda.Start(handlerWithRepo)
+	service := services.NewTransactionService(repository)
+	handler := handlers.NewTransactionProcessingHandler(service)
+	lambda.Start(handler.TransactionProcessingHandler)
 }

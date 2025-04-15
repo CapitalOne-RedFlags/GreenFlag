@@ -29,32 +29,26 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 	errorResults := make(chan error, len(transactions))
 
 	for _, txn := range transactions {
-		fs.PredictFraudSingle(txn, &wg)
+		wg.Add(1)
+		go func(txn models.Transaction) {
+			defer wg.Done()
+			isFraud, err := predictFraud(txn)
+			if err != nil {
+				errorResults <- err
+			}
+
+			if isFraud {
+				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
+				if err != nil {
+					errorResults <- err
+				}
+			}
+		}(txn)
 	}
 	wg.Wait()
 	close(errorResults)
 
 	return middleware.MergeErrors(errorResults)
-}
-
-func (fs *FraudService) PredictFraudSingle(txn models.Transaction, wg *sync.WaitGroup) error {
-	wg.Add(1)
-	predictTransactionFraudFunc := func(txn models.Transaction) {
-		defer wg.Done()
-		isFraud, err := predictFraud(txn)
-		if err != nil {
-			errorResults <- err
-		}
-
-		if isFraud {
-			err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
-			if err != nil {
-				errorResults <- err
-			}
-		}
-	}
-
-	go middleware.WithFraudPipelineErrorHandling(txn, predictTransactionFraudFunc)
 }
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm

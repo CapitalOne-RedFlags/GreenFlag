@@ -72,7 +72,8 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_Success() {
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[1]).Return(nil, "tx2", nil).Once()
 
 	// ✅ Call `TransactionService`
-	err := services.TransactionService(suite.ctx, transactions, suite.mockRepo)
+	service := services.NewTransactionService(suite.mockRepo)
+	err := service.TransactionService(suite.ctx, transactions)
 
 	// ✅ Verify expected calls
 	suite.mockRepo.AssertExpectations(suite.T())
@@ -89,7 +90,8 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_SaveError() {
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[0]).Return(nil, "", errors.New("DynamoDB error")).Once()
 
 	// ✅ Call `TransactionService`
-	err := services.TransactionService(suite.ctx, transactions, suite.mockRepo)
+	service := services.NewTransactionService(suite.mockRepo)
+	err := service.TransactionService(suite.ctx, transactions)
 
 	// ✅ Ensure expected calls were made
 	suite.mockRepo.AssertExpectations(suite.T())
@@ -99,7 +101,8 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_SaveError() {
 func (suite *TransactionServiceTestSuite) TestTransactionService_NoTransaction() {
 	var transactions []models.Transaction
 	// Call `TransactionService`
-	err := services.TransactionService(suite.ctx, transactions, suite.mockRepo)
+	service := services.NewTransactionService(suite.mockRepo)
+	err := service.TransactionService(suite.ctx, transactions)
 
 	// Ensure expected calls were made
 	suite.mockRepo.AssertExpectations(suite.T())
@@ -116,7 +119,8 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_ParitalFail() {
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[0]).Return(nil, "tx1", errors.New("DynamoDB error")).Once()
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[1]).Return(nil, "tx2", nil).Once()
 
-	err := services.TransactionService(suite.ctx, transactions, suite.mockRepo)
+	service := services.NewTransactionService(suite.mockRepo)
+	err := service.TransactionService(suite.ctx, transactions)
 
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.Error(suite.T(), err, "Should  return an error when transaction is partially saved")
@@ -134,7 +138,8 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_MultipuleFailur
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[0]).Return(nil, "tx1", errors.New("DynamoDB error")).Once()
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[1]).Return(nil, "tx2", errors.New("DynamoDB error")).Once()
 
-	err := services.TransactionService(suite.ctx, transactions, suite.mockRepo)
+	service := services.NewTransactionService(suite.mockRepo)
+	err := service.TransactionService(suite.ctx, transactions)
 
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.Error(suite.T(), err, "Should  return an error when transaction is partially saved")
@@ -170,7 +175,8 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_integration() {
 		},
 	)
 
-	serviceErr := services.TransactionService(suite.ctx, testTransaction, suite.testRepo.repository)
+	service := services.NewTransactionService(suite.testRepo.repository)
+	serviceErr := service.TransactionService(suite.ctx, testTransaction)
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.NoError(suite.T(), serviceErr, "Should not return an error when transactions are saved")
 
