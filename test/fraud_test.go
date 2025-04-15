@@ -31,10 +31,6 @@ func (m *MockEventDispatcher) DispatchFraudAlertEvent(txn models.Transaction) er
 
 func (m *MockFraudService) PredictFraud(transactions []models.Transaction) ([]models.Transaction, error) {
 	args := m.Called(transactions)
-	// If first return value is nil, return empty slice
-	if args.Get(0) == nil {
-		return []models.Transaction{}, args.Error(1)
-	}
 	return args.Get(0).([]models.Transaction), args.Error(1)
 }
 
@@ -138,7 +134,7 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return([]models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
@@ -164,7 +160,7 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
