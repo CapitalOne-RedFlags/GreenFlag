@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	gfEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
@@ -22,7 +21,7 @@ func NewTransactionProcessingHandler(service *services.TransactionService) *Tran
 	}
 }
 
-func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, repository db.TransactionRepository) (*gfEvents.BatchResult, error) {
+func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*gfEvents.BatchResult, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(event.Records))
 	batchResults := make(chan gfEvents.BatchItemFailure, len(event.Records))
