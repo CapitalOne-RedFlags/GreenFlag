@@ -43,7 +43,11 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 					errorResults <- err
 				}
 				body := "Thank you for your response. We have canceled this transaction. Your balance will be updated accordingly"
-				rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				if err != nil {
+					fmt.Printf("Error dispatching fraud event: %s", err)
+					errorResults <- err
+				}
 			} else if strings.ToUpper(strings.TrimSpace(msg.Body)) == "YES" {
 				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, false)
 				if err != nil {
@@ -51,10 +55,18 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 					errorResults <- err
 				}
 				body := "Thank you for your response. We have updated this trascation status to valid. Your balance will be updated accordingly"
-				rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				if err != nil {
+					fmt.Printf("Error dispatching fraud event: %s", err)
+					errorResults <- err
+				}
 			} else {
 				body := "Please reply YES if this was you or NO if it was not"
-				rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				err := rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, body)
+				if err != nil {
+					fmt.Printf("Error dispatching fraud event: %s", err)
+					errorResults <- err
+				}
 			}
 		}(msg)
 	}

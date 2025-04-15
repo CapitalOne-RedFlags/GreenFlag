@@ -87,6 +87,7 @@ type PredictFraudTestSuite struct {
 func (suite *PredictFraudTestSuite) SetupTest() {
 	suite.mockEventDispatcher = new(MockEventDispatcher)
 	suite.mockFraudService = new(MockFraudService)
+	suite.mockTransactionRepository = new(MockTransactionRepository)
 }
 
 // Fraud Service Tests
@@ -97,7 +98,23 @@ func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 		{Email: "safeuser@example.com", AccountID: "1", TransactionID: "1"},
 		{Email: "anotheruser@example.com", AccountID: "2", TransactionID: "2"},
 	}
+	suite.mockTransactionRepository.On(
+		"UpdateTransaction",
+		ctx,
+		"1", "1",
+		mock.MatchedBy(func(t *models.Transaction) bool {
+			return t.Email == "safeuser@example.com" && t.TransactionStatus == "APPROVED"
+		}),
+	).Return(nil, nil).Once()
 
+	suite.mockTransactionRepository.On(
+		"UpdateTransaction",
+		ctx,
+		"2", "2",
+		mock.MatchedBy(func(t *models.Transaction) bool {
+			return t.Email == "anotheruser@example.com" && t.TransactionStatus == "APPROVED"
+		}),
+	).Return(nil, nil).Once()
 	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
 
 	// Act
@@ -115,6 +132,11 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 	}
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[0]).Return(nil).Once()
+
+	suite.mockEventDispatcher.On("UpdateTransaction", ctx, "1", "1", mock.MatchedBy(func(t *models.Transaction) bool {
+		return t.AccountID == "1" && t.TransactionID == "1"
+	})).Return(nil, nil).Once()
+
 	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockEventDispatcher)
 
 	// Act
@@ -151,6 +173,32 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 		{Email: "rshart@wisc.edu", AccountID: "2", TransactionID: "2"},
 		{Email: "jpoconnell4@wisc.edu", AccountID: "3", TransactionID: "3"},
 	}
+	suite.mockTransactionRepository.On(
+		"UpdateTransaction",
+		ctx,
+		"1", "1",
+		mock.MatchedBy(func(t *models.Transaction) bool {
+			return t.Email == "jalarsen5@wisc.edu" && t.TransactionStatus == "APPROVED"
+		}),
+	).Return(nil, nil).Once()
+
+	suite.mockTransactionRepository.On(
+		"UpdateTransaction",
+		ctx,
+		"2", "2",
+		mock.MatchedBy(func(t *models.Transaction) bool {
+			return t.Email == "rshart@wisc.edu" && t.TransactionStatus == "POTENTIAL_FRAUD"
+		}),
+	).Return(nil, nil).Once()
+
+	suite.mockTransactionRepository.On(
+		"UpdateTransaction",
+		ctx,
+		"3", "3",
+		mock.MatchedBy(func(t *models.Transaction) bool {
+			return t.Email == "jpoconnell4@wisc.edu" && t.TransactionStatus == "POTENTIAL_FRAUD"
+		}),
+	).Return(nil, nil).Once()
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[1]).Return(nil).Once()
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[2]).Return(nil).Once()
@@ -161,6 +209,7 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return error for multiple transactions")
+	suite.mockTransactionRepository.AssertExpectations(suite.T())
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
 }
 

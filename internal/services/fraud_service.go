@@ -47,21 +47,27 @@ func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []model
 					errorResults <- err
 				} else {
 					txn.TransactionStatus = "POTENTIAL_FRAUD"
-					fs.TransactionRepo.UpdateTransaction(
+					_, err := fs.TransactionRepo.UpdateTransaction(
 						ctx,
 						txn.AccountID,
 						txn.TransactionID,
 						&txn,
 					)
+					if err != nil {
+						errorResults <- err
+					}
 				}
 			} else {
 				txn.TransactionStatus = "APPROVED"
-				fs.TransactionRepo.UpdateTransaction(
+				_, err := fs.TransactionRepo.UpdateTransaction(
 					ctx,
 					txn.AccountID,
 					txn.TransactionID,
 					&txn,
 				)
+				if err != nil {
+					errorResults <- err
+				}
 			}
 		}(txn)
 	}
