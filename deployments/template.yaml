@@ -16,6 +16,10 @@ Parameters:
     Type: String
     Description: ARN of the SQS queue holding transaction messages
 
+  TransactionDLQARN:
+    Type: String
+    Description: ARN of the SQS dead letter queue holding transaction messages
+
   DynamoDBTableName:
     Type: String
     Description: Name of the DynamoDB table
@@ -115,6 +119,9 @@ Resources:
       CodeUri: ../
       Handler: bootstrap
       Runtime: provided.al2
+      Environment:
+        Variables:
+          FRAUD_DLQ_URL: !GetAtt FraudDLQ.Url
       
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -124,13 +131,111 @@ Resources:
                 - sns:CreateTopic
                 - sns:Subscribe
                 - sns:Publish
-              Resource: !Ref NotificationTopic
+                - sqs:SendMessage
+              Resource:
+                - !Ref NotificationTopic
+                - !GetAtt FraudDLQ.Arn 
       Events:
         DynamoDBStream:
           Type: DynamoDB
           Properties:
             Stream: !GetAtt TransactionsTable.StreamArn
             StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !Ref TransactionDLQARN
+    Metadata:
+      BuildMethod: makefile
+
+  ########################################
+  # (5) Fraud Pipeline Dead Letter Queue
+  ########################################
+  FraudDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FraudDLQ
+
+  ########################################
+  # (6) Response Pipeline Dead Letter Queue
+  ########################################
+  ResponseDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ResponseDLQ
+
+  ########################################
+  # (7) TransactionPipelineRetryFunction
+  ########################################
+  TransactionPipelineRetryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TransactionPipelineRetryFunction
+      CodeUri: ../
+      Handler: bootstrap
+      Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+          IS_RETRY: true
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource: !Ref TransactionDLQARN
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref TransactionDLQARN
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+    Metadata:
+      BuildMethod: makefile
+
+  ########################################
+  # (4) FraudPipelineRetryFunction
+  ########################################
+  FraudPipelineRetryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FraudPipelineRetryFunction
+      CodeUri: ../
+      Handler: bootstrap
+      Runtime: provided.al2
+      Environment:
+        Variables:
+          IS_RETRY: true
+
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:CreateTopic
+                - sns:Subscribe
+                - sns:Publish
+                - sqs:SendMessage
+              Resource:
+                - !Ref NotificationTopic
+                - !GetAtt FraudDLQ.Arn 
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FraudDLQ.Arn
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
     Metadata:
@@ -152,3 +257,11 @@ Outputs:
   FraudPipelineArn:
     Description: "ARN of the FraudPipelineFunction"
     Value: !GetAtt FraudPipelineFunction.Arn
+
+  TransactionRetryArn:
+    Description: "ARN of the TransactionPipelineRetryFunction"
+    Value: !GetAtt TransactionPipelineRetryeFunction.Arn
+
+  FraudRetryArn:
+    Description: "ARN of the FraudPipelineRetryFunction"
+    Value: !GetAtt FraudPipelineRetryFunction.Arn

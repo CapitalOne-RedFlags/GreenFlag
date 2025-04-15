@@ -29,21 +29,7 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 	errorResults := make(chan error, len(transactions))
 
 	for _, txn := range transactions {
-		wg.Add(1)
-		go func(txn models.Transaction) {
-			defer wg.Done()
-			isFraud, err := predictFraud(txn)
-			if err != nil {
-				errorResults <- err
-			}
-
-			if isFraud {
-				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
-				if err != nil {
-					errorResults <- err
-				}
-			}
-		}(txn)
+		fs.PredictFraudSingle(txn, &wg)
 	}
 	wg.Wait()
 	close(errorResults)
@@ -51,8 +37,28 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 	return middleware.MergeErrors(errorResults)
 }
 
+func (fs *FraudService) PredictFraudSingle(txn models.Transaction, wg *sync.WaitGroup) error {
+	wg.Add(1)
+	predictTransactionFraudFunc := func(txn models.Transaction) {
+		defer wg.Done()
+		isFraud, err := predictFraud(txn)
+		if err != nil {
+			errorResults <- err
+		}
+
+		if isFraud {
+			err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
+			if err != nil {
+				errorResults <- err
+			}
+		}
+	}
+
+	go middleware.WithFraudPipelineErrorHandling(txn, predictTransactionFraudFunc)
+}
+
 // Placeholder for fraud prediction, to be replaced with prediction algorithm
 func predictFraud(transaction models.Transaction) (bool, error) {
-	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu", "c1redflagstest@gmail.com", "wlee298@wisc.edu", "donglaiduann@gmail.com" }, transaction.Email), nil
+	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu", "c1redflagstest@gmail.com", "wlee298@wisc.edu", "donglaiduann@gmail.com"}, transaction.Email), nil
 
 }
