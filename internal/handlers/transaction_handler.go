@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
@@ -17,30 +18,38 @@ func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, re
 	defer seg.Close(nil)
 
 	// Add metadata about the SQS event
-	seg.AddMetadata("EventRecordsCount", len(event.Records))
+	if err := seg.AddMetadata("EventRecordsCount", len(event.Records)); err != nil {
+		fmt.Printf("Failed to add EventRecordsCount metadata: %v\n", err)
+	}
 
 	// Create a subsegment for unmarshaling SQS messages
 	var transactions []models.Transaction
 	ctx, subSeg := xray.BeginSubsegment(ctx, "UnmarshalSQSMessages")
 	for i, record := range event.Records {
 		// Add annotation for each record
-		xray.AddAnnotation(ctx, "MessageID-"+strconv.Itoa(i), record.MessageId)
+		if err := xray.AddAnnotation(ctx, "MessageID-"+strconv.Itoa(i), record.MessageId); err != nil {
+			fmt.Printf("Failed to add MessageID annotation: %v\n", err)
+		}
 
 		result, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
-			subSeg.AddError(err)
+			if err := subSeg.AddError(err); err != nil {
+				fmt.Printf("Failed to add error to subsegment: %v\n", err)
+			}
 			subSeg.Close(err)
 			return err
 		}
 		transactions = append(transactions, *result)
 
 		// Add transaction metadata to the subsegment
-		subSeg.AddMetadata("Transaction-"+strconv.Itoa(i), map[string]interface{}{
+		if err := subSeg.AddMetadata("Transaction-"+strconv.Itoa(i), map[string]interface{}{
 			"TransactionID": result.TransactionID,
 			"AccountID":     result.AccountID,
 			"Amount":        result.TransactionAmount,
 			"Email":         result.Email,
-		})
+		}); err != nil {
+			fmt.Printf("Failed to add Transaction metadata: %v\n", err)
+		}
 	}
 	subSeg.Close(nil)
 
@@ -56,14 +65,22 @@ func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, re
 		accountIDs = append(accountIDs, txn.AccountID)
 		emails = append(emails, txn.Email)
 	}
-	txnSeg.AddMetadata("TransactionIDs", transactionIDs)
-	txnSeg.AddMetadata("AccountIDs", accountIDs)
-	txnSeg.AddMetadata("Emails", emails)
+	if err := txnSeg.AddMetadata("TransactionIDs", transactionIDs); err != nil {
+		fmt.Printf("Failed to add TransactionIDs metadata: %v\n", err)
+	}
+	if err := txnSeg.AddMetadata("AccountIDs", accountIDs); err != nil {
+		fmt.Printf("Failed to add AccountIDs metadata: %v\n", err)
+	}
+	if err := txnSeg.AddMetadata("Emails", emails); err != nil {
+		fmt.Printf("Failed to add Emails metadata: %v\n", err)
+	}
 
 	// Pass the X-Ray context to the service layer
 	err := services.TransactionService(ctx, transactions, repository)
 	if err != nil {
-		txnSeg.AddError(err)
+		if err := txnSeg.AddError(err); err != nil {
+			fmt.Printf("Failed to add error to transaction segment: %v\n", err)
+		}
 	}
 	txnSeg.Close(err)
 
