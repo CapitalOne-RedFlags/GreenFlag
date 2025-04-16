@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"sync"
 
 	"slices"
@@ -43,7 +44,15 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]mod
 				fraudResults <- txn
 				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
 				if err != nil {
-					errorResults <- err
+					wrappedErr := fmt.Errorf("fraud prediction failed for transaction %s (account: %s, amount: %.2f, merchant: %s, email: %s): %w",
+						txn.TransactionID,
+						txn.AccountID,
+						txn.TransactionAmount,
+						txn.MerchantID,
+						txn.Email,
+						err)
+					errorResults <- wrappedErr
+					return
 				}
 			}
 		}(txn)
