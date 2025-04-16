@@ -32,6 +32,7 @@ capabilities = "CAPABILITY_IAM"
 ```toml
 parameter_overrides = [
   "TransactionQueueARN=arn:aws:sqs:us-east-1:140023383737:Bank_Transactions",
+  "TransactionDLQARN=arn:aws:sqs:us-east-1:140023383737:TransactionDLQ",
   "DynamoDBTableName=Transactions",
   "AWSRegion=us-east-1"
 ]

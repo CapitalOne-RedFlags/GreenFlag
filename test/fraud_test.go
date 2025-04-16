@@ -183,7 +183,7 @@ func (suite *PredictFraudTestSuite) TestRetryFraudPipeline() {
 	testTxn1 := GetTestTransaction("test@example.com")
 	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
 	testTxn3 := GetTestTransaction("test@example.com")
-	shouldSucceed := []models.Transaction{testTxn1, testTxn2}
+	shouldSucceed := []models.Transaction{testTxn1, testTxn2, testTxn3}
 
 	event := events.SQSEvent{
 		Records: []events.SQSMessage{
