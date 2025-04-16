@@ -32,7 +32,9 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	defer seg.Close(nil)
 
 	// Add metadata about the event
-	seg.AddMetadata("EventRecordsCount", len(event.Records))
+	if err := seg.AddMetadata("EventRecordsCount", len(event.Records)); err != nil {
+		fmt.Printf("Failed to add EventRecordsCount metadata: %v\n", err)
+	}
 
 	// Create a subsegment for processing DynamoDB records
 	ctx, procSeg := xray.BeginSubsegment(ctx, "ProcessDynamoDBRecords")
@@ -42,7 +44,9 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 
 	for i, record := range event.Records {
 		// Add annotation for each record
-		xray.AddAnnotation(ctx, "RecordID-"+strconv.Itoa(i), record.EventID)
+		if err := xray.AddAnnotation(ctx, "RecordID-"+strconv.Itoa(i), record.EventID); err != nil {
+			fmt.Printf("Failed to add RecordID annotation: %v\n", err)
+		}
 
 		if record.EventName != "INSERT" {
 			continue
@@ -55,7 +59,9 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 
 		transaction, err := models.UnmarshalDynamoDB(attributeValueMap)
 		if err != nil {
-			procSeg.AddError(err)
+			if err := procSeg.AddError(err); err != nil {
+				fmt.Printf("Failed to add error to segment: %v\n", err)
+			}
 			procSeg.Close(err)
 			return err
 		}
@@ -65,7 +71,9 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	}
 
 	// Add transaction IDs to metadata
-	procSeg.AddMetadata("TransactionIDs", transactionIDs)
+	if err := procSeg.AddMetadata("TransactionIDs", transactionIDs); err != nil {
+		fmt.Printf("Failed to add TransactionIDs metadata: %v\n", err)
+	}
 	procSeg.Close(nil)
 
 	// Create a subsegment for fraud prediction
@@ -76,7 +84,9 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	for _, txn := range transactions {
 		emailsChecked = append(emailsChecked, txn.Email)
 	}
-	fraudSeg.AddMetadata("EmailsChecked", emailsChecked)
+	if err := fraudSeg.AddMetadata("EmailsChecked", emailsChecked); err != nil {
+		fmt.Printf("Failed to add EmailsChecked metadata: %v\n", err)
+	}
 
 	// Call the fraud service
 	fraudulentTransactions, err := fh.FraudService.PredictFraud(transactions)
@@ -93,18 +103,34 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 			fraudAmounts = append(fraudAmounts, txn.TransactionAmount)
 		}
 
-		fraudSeg.AddMetadata("FraudDetected", true)
-		fraudSeg.AddMetadata("FraudulentTransactionIDs", fraudIDs)
-		fraudSeg.AddMetadata("FraudulentEmails", fraudEmails)
-		fraudSeg.AddMetadata("FraudulentAmounts", fraudAmounts)
-		fraudSeg.AddMetadata("FraudCount", len(fraudulentTransactions))
+		if err := fraudSeg.AddMetadata("FraudDetected", true); err != nil {
+			fmt.Printf("Failed to add FraudDetected metadata: %v\n", err)
+		}
+		if err := fraudSeg.AddMetadata("FraudulentTransactionIDs", fraudIDs); err != nil {
+			fmt.Printf("Failed to add FraudulentTransactionIDs metadata: %v\n", err)
+		}
+		if err := fraudSeg.AddMetadata("FraudulentEmails", fraudEmails); err != nil {
+			fmt.Printf("Failed to add FraudulentEmails metadata: %v\n", err)
+		}
+		if err := fraudSeg.AddMetadata("FraudulentAmounts", fraudAmounts); err != nil {
+			fmt.Printf("Failed to add FraudulentAmounts metadata: %v\n", err)
+		}
+		if err := fraudSeg.AddMetadata("FraudCount", len(fraudulentTransactions)); err != nil {
+			fmt.Printf("Failed to add FraudCount metadata: %v\n", err)
+		}
 	} else {
-		fraudSeg.AddMetadata("FraudDetected", false)
-		fraudSeg.AddMetadata("FraudCount", 0)
+		if err := fraudSeg.AddMetadata("FraudDetected", false); err != nil {
+			fmt.Printf("Failed to add FraudDetected metadata: %v\n", err)
+		}
+		if err := fraudSeg.AddMetadata("FraudCount", 0); err != nil {
+			fmt.Printf("Failed to add FraudCount metadata: %v\n", err)
+		}
 	}
 
 	if err != nil {
-		fraudSeg.AddError(err)
+		if err := fraudSeg.AddError(err); err != nil {
+			fmt.Printf("Failed to add error to fraud segment: %v\n", err)
+		}
 	}
 
 	fraudSeg.Close(err)
