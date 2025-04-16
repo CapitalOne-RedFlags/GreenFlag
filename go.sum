@@ -110,6 +110,12 @@ go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJyS
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
 go.opentelemetry.io/contrib/detectors/aws/ecs v1.35.0 h1:toE98lwxdLF1OxIbMdZcyGVc2ZD0XrWpovhn5fZJ8vk=
 go.opentelemetry.io/contrib/detectors/aws/ecs v1.35.0/go.mod h1:+l5GJMpwBBnZvwUbpH8vu/ZYi3aoTyJaXNhEZrQZq3g=
+go.opentelemetry.io/contrib/detectors/aws/lambda v0.60.0 h1:Om6pskLDlk/7z2GnEd5EPKicRyHDxAllB/blwBtRUGs=
+go.opentelemetry.io/contrib/detectors/aws/lambda v0.60.0/go.mod h1:nBBYZA5XJqgevAUMvhvmnFmRDRZDy6eNmoYzLEDJAVQ=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.60.0 h1:pUL0uJo/nr07jm4rmgWpXmPoWGg3ufJo07uQdwIr1Ic=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.60.0/go.mod h1:8vxU8w5vU1dq46EtJ6VuL3fQh7Zoxnz2hzSSn7mfkb8=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig v0.60.0 h1:QpJGbx2YZDhrQs+aALs5FswaWMQgdsz41kgBipDT8RU=
+go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig v0.60.0/go.mod h1:trx2Ge8m+3F9SX8CyNNgciApOBivS5SrdDsXz8PnZPg=
 go.opentelemetry.io/contrib/propagators/aws v1.35.0 h1:xoXA+5dVwsf5uE5GvSJ3lKiapyMFuIzbEmJwQ0JP+QU=
 go.opentelemetry.io/contrib/propagators/aws v1.35.0/go.mod h1:s11Orts/IzEgw9Srw5iRXtk2kM2j3jt/45noUWyf60E=
 go.opentelemetry.io/otel v1.35.0 h1:xKWKPxrxB6OtMCbmMY021CqC45J+3Onta9MqjhnusiQ=
