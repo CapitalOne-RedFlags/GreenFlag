@@ -50,11 +50,11 @@ sam-build:
 # Deploy the stack using SAM deploy
 .PHONY: deploy
 deploy: sam-build
-	sam deploy --stack-name $(STACK_NAME) --capabilities CAPABILITY_IAM --profile $(PROFILE) --no-confirm-changeset
+	sam deploy --stack-name $(STACK_NAME) --capabilities CAPABILITY_IAM --profile $(PROFILE) --resolve-s3 --no-confirm-changeset
 
 # Use sam sync for iterative deployments during development
 .PHONY: sync
-sync:
+sync: sam-build
 	sam sync --stack-name $(STACK_NAME) --watch -t $(TEMPLATE_FILE) --profile $(PROFILE)
 
 # Clean up: Delete the CloudFormation stack and remove build artifacts
