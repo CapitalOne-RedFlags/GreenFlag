@@ -23,7 +23,8 @@ type GfResponseService struct {
 const (
 	ResponseFraudConfirmed  = "Thank you for your response. We have canceled this transaction. Your balance will be updated accordingly."
 	ResponseFraudRejected   = "Thank you for your response. We have updated this transaction status to valid. Your balance will be updated accordingly."
-	ResponseInvalidResponse = "Please reply YES if this was you or NO if it was not."
+	ResponseInvalidResponse = "If texted about fraud, please reply YES if this was you or NO if it was not. Otherwise do not text this number."
+	ResponseUnknown         = "Please do not text this number unless prompted"
 )
 
 func NewGfResponseService(dispatcher events.EventDispatcher, repo db.TransactionRepository) *GfResponseService {
@@ -42,28 +43,44 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 		go func(msg models.TwilioMessage) {
 			defer wg.Done()
 			if msg.ParseUserResponse() == "NO" {
-				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, true, "POTENTIAL_FRAUD")
+				count, err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, true, "POTENTIAL_FRAUD")
 				if err != nil {
 					fmt.Printf("Error updating fraud transaction: %s", err)
 					errorResults <- err
 				}
-				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudConfirmed)
-				if err != nil {
-					fmt.Printf("Error dispatching fraud event: %s", err)
-					errorResults <- err
+				if count == 0 {
+					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseUnknown)
+					if err != nil {
+						fmt.Printf("Error dispatching fraud event: %s", err)
+						errorResults <- err
+					}
+				} else {
+					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudConfirmed)
+					if err != nil {
+						fmt.Printf("Error dispatching fraud event: %s", err)
+						errorResults <- err
+					}
 				}
 			} else if msg.ParseUserResponse() == "YES" {
-				err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, false, "POTENTIAL_FRAUD")
+				count, err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, false, "POTENTIAL_FRAUD")
 				if err != nil {
 					fmt.Printf("Error updating fraud transaction: %s", err)
 					errorResults <- err
 				}
-
-				err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudRejected)
-				if err != nil {
-					fmt.Printf("Error dispatching fraud event: %s", err)
-					errorResults <- err
+				if count == 0 {
+					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseUnknown)
+					if err != nil {
+						fmt.Printf("Error dispatching fraud event: %s", err)
+						errorResults <- err
+					}
+				} else {
+					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudRejected)
+					if err != nil {
+						fmt.Printf("Error dispatching fraud event: %s", err)
+						errorResults <- err
+					}
 				}
+
 			} else {
 				err := rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseInvalidResponse)
 				if err != nil {

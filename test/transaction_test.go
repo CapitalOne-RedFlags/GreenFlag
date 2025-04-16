@@ -28,9 +28,9 @@ func (m *MockTransactionRepository) GetTransactionByNumberAndStatus(ctx context.
 }
 
 // UpdateFraudTransaction implements db.TransactionRepository.
-func (m *MockTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error {
+func (m *MockTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) (int, error) {
 	args := m.Called(ctx, phoneNumber, isFraud)
-	return args.Error(0)
+	return 1, args.Error(1)
 }
 
 // ✅ Implement `SaveTransaction`

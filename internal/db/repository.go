@@ -22,7 +22,7 @@ type TransactionRepository interface {
 	GetTransaction(ctx context.Context, accountID, transactionID string) (*models.Transaction, error)
 	GetTransactionByNumberAndStatus(ctx context.Context, phoneNumber string, status string) ([]models.Transaction, error)
 	UpdateTransaction(ctx context.Context, accountID, transactionID string, values *models.Transaction) (*dynamodb.UpdateItemOutput, error)
-	UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error
+	UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) (int, error)
 	DeleteTransaction(ctx context.Context, accountID, transactionID string) error
 }
 
@@ -190,10 +190,13 @@ func (r *DynamoTransactionRepository) DeleteTransaction(ctx context.Context, acc
 	return nil
 }
 
-func (r *DynamoTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error {
+func (r *DynamoTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) (int, error) {
 	potentialFrauds, err := r.GetTransactionByNumberAndStatus(ctx, phoneNumber, status)
 	if err != nil {
-		return err
+		return 0, err
+	}
+	if len(potentialFrauds) == 0 {
+		return 0, nil
 	}
 
 	var wg sync.WaitGroup
@@ -234,5 +237,5 @@ func (r *DynamoTransactionRepository) UpdateFraudTransaction(ctx context.Context
 	}
 	wg.Wait()
 	close(errorResults)
-	return middleware.MergeErrors(errorResults)
+	return len(potentialFrauds), middleware.MergeErrors(errorResults)
 }

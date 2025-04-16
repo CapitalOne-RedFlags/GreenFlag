@@ -46,9 +46,9 @@ func (m *MockEventDispatcher) SaveTransaction(ctx context.Context, t *models.Tra
 }
 
 // UpdateFraudTransaction implements db.TransactionRepository.
-func (m *MockEventDispatcher) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) error {
+func (m *MockEventDispatcher) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) (int, error) {
 	args := m.Called(ctx, phoneNumber, isFraud, status)
-	return args.Error(0)
+	return 1, args.Error(1)
 }
 
 // UpdateTransaction implements db.TransactionRepository.
