@@ -50,6 +50,7 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]mod
 	}
 	wg.Wait()
 	close(errorResults)
+	close(failedTransactions)
 
 	return channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
 }
