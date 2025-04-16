@@ -43,10 +43,6 @@ func main() {
 	responseService := services.NewGfResponseService(dispathcer, repository)
 	responseHandler := handlers.NewResponseHandler(responseService)
 
-	if err != nil {
-		log.Fatalf("Failed to load AWS configuration: %s\n", err)
-	}
-
 	lambda.Start(responseHandler.ProcessResponseEvent)
 
 }
