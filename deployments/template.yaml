@@ -244,6 +244,8 @@ Resources:
             Queue: !GetAtt FraudDLQ.Arn
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
     Metadata:
       BuildMethod: makefile
 

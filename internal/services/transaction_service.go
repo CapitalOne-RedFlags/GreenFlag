@@ -26,11 +26,12 @@ func (ts *TransactionService) TransactionService(ctx context.Context, transactio
 
 	for _, record := range transactions {
 		wg.Add(1)
-		go func(result models.Transaction) {
+		go func(txn models.Transaction) {
 			defer wg.Done()
-			_, _, err := ts.repository.SaveTransaction(ctx, &result)
+			_, _, err := ts.repository.SaveTransaction(ctx, &txn)
 			if err != nil {
 				errorResults <- err
+				failedTransactions <- txn
 			}
 		}(record)
 	}
