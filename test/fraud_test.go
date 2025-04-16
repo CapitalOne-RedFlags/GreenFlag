@@ -29,9 +29,9 @@ func (m *MockEventDispatcher) DispatchFraudAlertEvent(txn models.Transaction) er
 	return args.Error(0)
 }
 
-func (m *MockFraudService) PredictFraud(transactions []models.Transaction) error {
+func (m *MockFraudService) PredictFraud(transactions []models.Transaction) ([]models.Transaction, error) {
 	args := m.Called(transactions)
-	return args.Error(0)
+	return args.Get(0).([]models.Transaction), args.Error(1)
 }
 
 type PredictFraudTestSuite struct {
@@ -56,7 +56,7 @@ func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	_, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error for non-fraud transactions")
@@ -72,7 +72,7 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	_, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error when fraud alert is successfully dispatched")
@@ -89,7 +89,7 @@ func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	_, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.Error(suite.T(), err, "Should return an error when fraud alert dispatch fails")
@@ -109,7 +109,7 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	_, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return error for multiple transactions")
@@ -134,7 +134,7 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return([]models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
@@ -160,7 +160,7 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act

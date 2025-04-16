@@ -10,6 +10,7 @@ Globals:
     Timeout: 10
     Architectures:
       - x86_64
+    Tracing: Active
 
 Parameters:
   TransactionQueueARN:
@@ -79,8 +80,50 @@ Resources:
       Environment:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+          OTEL_CONFIG_CONTENT: |
+            receivers:
+              otlp:
+                protocols:
+                  grpc:
+                    endpoint: "localhost:4317"
+                  http:
+                    endpoint: "localhost:4318"
+            
+            processors:
+              batch:
+                timeout: 1s
+                send_batch_size: 50
+              attributes:
+                actions:
+                  - key: service.name
+                    value: "greenflag-transaction-service"
+                    action: upsert
+                  - key: deployment.environment
+                    value: "${ENV:ENVIRONMENT_NAME:development}"
+                    action: upsert
+            
+            exporters:
+              awsxray:
+                region: "${ENV:AWS_REGION:us-east-1}"
+              logging:
+                verbosity: detailed
+                sampling_initial: 5
+                sampling_thereafter: 200
+            
+            service:
+              pipelines:
+                traces:
+                  receivers: [otlp]
+                  processors: [batch, attributes]
+                  exporters: [awsxray, logging]
+              telemetry:
+                logs:
+                  level: "info"
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-collector-amd64-ver-0-115-0:3"
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
         - Statement:
             - Effect: Allow
               Action:
@@ -118,6 +161,7 @@ Resources:
       
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
         - Statement:
             - Effect: Allow
               Action:
@@ -133,6 +177,50 @@ Resources:
             StartingPosition: TRIM_HORIZON
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-collector-amd64-ver-0-115-0:3"
+      Environment:
+        Variables:
+          OTEL_CONFIG_CONTENT: |
+            receivers:
+              otlp:
+                protocols:
+                  grpc:
+                    endpoint: "localhost:4317"
+                  http:
+                    endpoint: "localhost:4318"
+            
+            processors:
+              batch:
+                timeout: 1s
+                send_batch_size: 50
+              attributes:
+                actions:
+                  - key: service.name
+                    value: "greenflag-fraud-service"
+                    action: upsert
+                  - key: deployment.environment
+                    value: "${ENV:ENVIRONMENT_NAME:development}"
+                    action: upsert
+            
+            exporters:
+              awsxray:
+                region: "${ENV:AWS_REGION:us-east-1}"
+              logging:
+                verbosity: detailed
+                sampling_initial: 5
+                sampling_thereafter: 200
+            
+            service:
+              pipelines:
+                traces:
+                  receivers: [otlp]
+                  processors: [batch, attributes]
+                  exporters: [awsxray, logging]
+              telemetry:
+                logs:
+                  level: "info"
+      Tracing: Active
     Metadata:
       BuildMethod: makefile
 
