@@ -40,7 +40,7 @@ build-FraudPipelineFunction:
 
 # Build TransactionPipelineRetryFunction binary
 .PHONY: build-TransactionPipelineRetryFunction
-build-TransactionPipelineRetrFunction:
+build-TransactionPipelineRetryFunction:
 	mkdir -p $(ARTIFACTS_DIR)
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -tags lambda.norpc -o $(ARTIFACTS_DIR)/bootstrap ./cmd/lambda/transactions/transaction_pipeline.go
 

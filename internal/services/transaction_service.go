@@ -19,9 +19,11 @@ func NewTransactionService(repository db.TransactionRepository) *TransactionServ
 	}
 }
 
-func (ts *TransactionService) TransactionService(ctx context.Context, transactions []models.Transaction) error {
+func (ts *TransactionService) TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
+	failedTransactions := make(chan models.Transaction, len(transactions))
+
 	for _, record := range transactions {
 		wg.Add(1)
 		go func(result models.Transaction) {
@@ -33,21 +35,17 @@ func (ts *TransactionService) TransactionService(ctx context.Context, transactio
 		}(record)
 	}
 	wg.Wait()
+
 	close(errorResults)
-	return middleware.MergeErrors(errorResults)
+	close(failedTransactions)
+
+	return channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
 }
 
-func (ts *TransactionService) SaveTransaction(ctx context.Context, txn models.Transaction, wg *sync.WaitGroup) error {
-	errorResult := make(chan error)
-	wg.Add(1)
-	go func(result models.Transaction) {
-		defer wg.Done()
-		_, _, err := ts.repository.SaveTransaction(ctx, &txn)
-		if err != nil {
-			errorResult <- err
-		}
-	}(txn)
-	wg.Wait()
-
-	return <-errorResult
+func channelToSlice[T any](ch <-chan T) []T {
+	var result []T
+	for val := range ch {
+		result = append(result, val)
+	}
+	return result
 }

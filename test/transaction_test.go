@@ -73,11 +73,12 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_Success() {
 
 	// ✅ Call `TransactionService`
 	service := services.NewTransactionService(suite.mockRepo)
-	err := service.TransactionService(suite.ctx, transactions)
+	failedTransactions, err := service.TransactionService(suite.ctx, transactions)
 
 	// ✅ Verify expected calls
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.NoError(suite.T(), err, "Should not return an error when transaction is sucessfully saved")
+	assert.Empty(suite.T(), failedTransactions)
 }
 
 // Test Case: Save Fails Due to DynamoDB Error
@@ -91,22 +92,24 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_SaveError() {
 
 	// ✅ Call `TransactionService`
 	service := services.NewTransactionService(suite.mockRepo)
-	err := service.TransactionService(suite.ctx, transactions)
+	failedTransactions, err := service.TransactionService(suite.ctx, transactions)
 
 	// ✅ Ensure expected calls were made
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.Error(suite.T(), err, "Should return an error when transaction is sucessfully saved")
+	assert.Len(suite.T(), failedTransactions, 1)
 }
 
 func (suite *TransactionServiceTestSuite) TestTransactionService_NoTransaction() {
 	var transactions []models.Transaction
 	// Call `TransactionService`
 	service := services.NewTransactionService(suite.mockRepo)
-	err := service.TransactionService(suite.ctx, transactions)
+	failedTransactions, err := service.TransactionService(suite.ctx, transactions)
 
 	// Ensure expected calls were made
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.NoError(suite.T(), err, "Should not return an error when no transactions are saved")
+	assert.Empty(suite.T(), failedTransactions)
 }
 
 func (suite *TransactionServiceTestSuite) TestTransactionService_ParitalFail() {
@@ -120,12 +123,12 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_ParitalFail() {
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[1]).Return(nil, "tx2", nil).Once()
 
 	service := services.NewTransactionService(suite.mockRepo)
-	err := service.TransactionService(suite.ctx, transactions)
+	failedTransactions, err := service.TransactionService(suite.ctx, transactions)
 
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.Error(suite.T(), err, "Should  return an error when transaction is partially saved")
 	assert.Len(suite.T(), strings.Split(err.Error(), "\n"), 1)
-
+	assert.Len(suite.T(), failedTransactions, 1)
 }
 
 func (suite *TransactionServiceTestSuite) TestTransactionService_MultipuleFailures() {
@@ -139,12 +142,12 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_MultipuleFailur
 	suite.mockRepo.On("SaveTransaction", suite.ctx, &transactions[1]).Return(nil, "tx2", errors.New("DynamoDB error")).Once()
 
 	service := services.NewTransactionService(suite.mockRepo)
-	err := service.TransactionService(suite.ctx, transactions)
+	failedTransactions, err := service.TransactionService(suite.ctx, transactions)
 
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.Error(suite.T(), err, "Should  return an error when transaction is partially saved")
 	assert.Len(suite.T(), strings.Split(err.Error(), "\n"), 2)
-
+	assert.Len(suite.T(), failedTransactions, 2)
 }
 
 func (suite *TransactionServiceTestSuite) TestTransactionService_integration() {
@@ -176,9 +179,11 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_integration() {
 	)
 
 	service := services.NewTransactionService(suite.testRepo.repository)
-	serviceErr := service.TransactionService(suite.ctx, testTransaction)
+	failedTransactions, serviceErr := service.TransactionService(suite.ctx, testTransaction)
+
 	suite.mockRepo.AssertExpectations(suite.T())
 	assert.NoError(suite.T(), serviceErr, "Should not return an error when transactions are saved")
+	assert.Empty(suite.T(), failedTransactions)
 
 	res, getTransErr := suite.testRepo.repository.GetTransaction(suite.ctx, testTransaction[0].AccountID, testTransaction[0].TransactionID)
 	assert.NoError(suite.T(), getTransErr, "Should not return an error when transactions are saved")

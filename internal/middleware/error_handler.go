@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
 
 func MergeErrors(errCh <-chan error) error {
@@ -15,13 +16,29 @@ func MergeErrors(errCh <-chan error) error {
 	return errors.Join(result...)
 }
 
-func MergeBatchItemFailures(ch <-chan events.BatchItemFailure) *events.BatchResult {
-	result := []events.BatchItemFailure{}
-	for batchItemFailure := range ch {
-		result = append(result, batchItemFailure)
+type GetBatchResultInput struct {
+	FailedTransactions  []models.Transaction
+	RIDsByTransactionId map[string]string
+	FailedRIDs          []string
+	Errors              []error
+}
+
+func GetBatchResult(input *GetBatchResultInput) (*events.BatchResult, error) {
+	var results []events.BatchItemFailure
+
+	for _, txn := range input.FailedTransactions {
+		results = append(results, events.BatchItemFailure{
+			ItemIdentifier: input.RIDsByTransactionId[txn.TransactionID],
+		})
+	}
+
+	for _, rid := range input.FailedRIDs {
+		results = append(results, events.BatchItemFailure{
+			ItemIdentifier: rid,
+		})
 	}
 
 	return &events.BatchResult{
-		BatchItemFailures: result,
-	}
+		BatchItemFailures: results,
+	}, errors.Join(input.Errors...)
 }

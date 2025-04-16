@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"sync"
 
 	gfEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
@@ -22,30 +21,33 @@ func NewTransactionProcessingHandler(service *services.TransactionService) *Tran
 }
 
 func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*gfEvents.BatchResult, error) {
-	var wg sync.WaitGroup
-	errorResults := make(chan error, len(event.Records))
-	batchResults := make(chan gfEvents.BatchItemFailure, len(event.Records))
+	var errorResults []error
+	var failedRIDs []string
+	var transactions []models.Transaction
+	messageIdsByTransactionId := make(map[string]string)
 
 	for _, record := range event.Records {
 		transaction, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
-			errorResults <- err
-			batchResults <- gfEvents.BatchItemFailure{
-				ItemIdentifier: record.MessageId,
-			}
-			continue
+			errorResults = append(errorResults, err)
+			failedRIDs = append(failedRIDs, record.MessageId)
 		}
 
-		if err := tph.service.SaveTransaction(ctx, *transaction, &wg); err != nil {
-			errorResults <- err
-			batchResults <- gfEvents.BatchItemFailure{
-				ItemIdentifier: record.MessageId,
-			}
-		}
+		transactions = append(transactions, *transaction)
+		messageIdsByTransactionId[transaction.TransactionID] = record.MessageId
 	}
 
-	close(errorResults)
-	close(batchResults)
+	failedTransactions, err := tph.service.TransactionService(ctx, transactions)
+	if err != nil {
+		errorResults = append(errorResults, err)
+	}
 
-	return middleware.MergeBatchItemFailures(batchResults), middleware.MergeErrors(errorResults)
+	batchResultInput := &middleware.GetBatchResultInput{
+		FailedTransactions:  failedTransactions,
+		RIDsByTransactionId: messageIdsByTransactionId,
+		FailedRIDs:          failedRIDs,
+		Errors:              errorResults,
+	}
+
+	return middleware.GetBatchResult(batchResultInput)
 }
