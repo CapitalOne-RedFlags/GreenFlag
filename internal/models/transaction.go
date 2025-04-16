@@ -178,14 +178,9 @@ func formatDateTime(dt string) string {
 
 // Get subject, message for an email fraud alert
 func (txn *Transaction) GetFraudEmailContent() (string, string) {
-	return "Suspicious Activity on Your Credit Card", fmt.Sprintf(
-		`CAPITAL ONE: We detected a suspicious transaction on your card ending in %s for $%.2f at %s
-	on %s. If this was you, reply YES. If not, reply NO or call us at 1-800-XXX-XXXX immediately.
-	Do not share your account details with anyone.`,
-		last4(txn.AccountID), // Helper function to extract last 4 digits/characters
-		txn.TransactionAmount,
+	return "Suspicious Activity on Your Card", fmt.Sprintf("CAPITAL ONE: We detected a suspicious transaction on your card ending in 1234 for $%.2f at %s on %s. If this was you, reply YES. If not, reply NO or call us immediately.", txn.TransactionAmount,
 		txn.MerchantID,
-		formatDateTime(txn.TransactionDate), // Another helper function for date formatting
+		formatDateTime(txn.TransactionDate),
 	)
 
 }
