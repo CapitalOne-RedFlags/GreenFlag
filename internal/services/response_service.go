@@ -12,7 +12,7 @@ import (
 )
 
 type ResponseService interface {
-	UpdateTransaction(ctx context.Context, messages []models.TwilioMessage) error
+	UpdateTransaction(ctx context.Context, messages []models.TwilioMessage) ([]models.TwilioMessage, error)
 }
 
 type GfResponseService struct {
@@ -34,9 +34,10 @@ func NewGfResponseService(dispatcher events.EventDispatcher, repo db.Transaction
 	}
 }
 
-func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []models.TwilioMessage) error {
+func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []models.TwilioMessage) ([]models.TwilioMessage, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(messages))
+	var failedMessages []models.TwilioMessage
 
 	for _, msg := range messages {
 		wg.Add(1)
@@ -46,18 +47,21 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 				count, err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, true, "POTENTIAL_FRAUD")
 				if err != nil {
 					fmt.Printf("Error updating fraud transaction: %s", err)
+					failedMessages = append(failedMessages, msg)
 					errorResults <- err
 				}
 				if count == 0 {
 					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseUnknown)
 					if err != nil {
 						fmt.Printf("Error dispatching fraud event: %s", err)
+						failedMessages = append(failedMessages, msg)
 						errorResults <- err
 					}
 				} else {
 					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudConfirmed)
 					if err != nil {
 						fmt.Printf("Error dispatching fraud event: %s", err)
+						failedMessages = append(failedMessages, msg)
 						errorResults <- err
 					}
 				}
@@ -65,18 +69,21 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 				count, err := rs.TransactionRepo.UpdateFraudTransaction(ctx, msg.From, false, "POTENTIAL_FRAUD")
 				if err != nil {
 					fmt.Printf("Error updating fraud transaction: %s", err)
+					failedMessages = append(failedMessages, msg)
 					errorResults <- err
 				}
 				if count == 0 {
 					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseUnknown)
 					if err != nil {
 						fmt.Printf("Error dispatching fraud event: %s", err)
+						failedMessages = append(failedMessages, msg)
 						errorResults <- err
 					}
 				} else {
 					err = rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseFraudRejected)
 					if err != nil {
 						fmt.Printf("Error dispatching fraud event: %s", err)
+						failedMessages = append(failedMessages, msg)
 						errorResults <- err
 					}
 				}
@@ -85,6 +92,7 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 				err := rs.EventDispatcher.DispatchFraudUpdateEvent(msg.From, ResponseInvalidResponse)
 				if err != nil {
 					fmt.Printf("Error dispatching fraud event: %s", err)
+					failedMessages = append(failedMessages, msg)
 					errorResults <- err
 				}
 			}
@@ -93,5 +101,5 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 	wg.Wait()
 	close(errorResults)
 
-	return middleware.MergeErrors(errorResults)
+	return failedMessages, middleware.MergeErrors(errorResults)
 }
