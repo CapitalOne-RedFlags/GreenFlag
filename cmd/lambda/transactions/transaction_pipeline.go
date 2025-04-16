@@ -32,13 +32,13 @@ func main() {
 	// Initialize OpenTelemetry
 	tp, err := xrayconfig.NewTracerProvider(ctx)
 	if err != nil {
-		// Handle error
+		fmt.Printf("Error initializing OpenTelemetry tracer provider\n%s", err)
 	}
 
 	defer func(ctx context.Context) {
 		err := tp.Shutdown(ctx)
 		if err != nil {
-			// Handle error
+			fmt.Printf("Error shutting down OpenTelemetry tracer provider: %v\n", err)
 		}
 	}(ctx)
 

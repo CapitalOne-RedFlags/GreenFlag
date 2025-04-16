@@ -30,13 +30,13 @@ func main() {
 	// Initialize OpenTelemetry
 	tp, err := xrayconfig.NewTracerProvider(context)
 	if err != nil {
-		log.Fatalf("Failed to load X-ray configuration: %s\n", err)
+		log.Fatalf("Error initializing OpenTelemetry tracer provider: %s\n", err)
 	}
 
 	defer func() {
 		err := tp.Shutdown(context)
 		if err != nil {
-			log.Fatalf("Failed to shut down X-ray configuration: %s\n", err)
+			log.Fatalf("Error shutting down OpenTelemetry tracer provider: %s\n", err)
 		}
 	}()
 
