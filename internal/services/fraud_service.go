@@ -11,7 +11,7 @@ import (
 )
 
 type FraudService interface {
-	PredictFraud(transactions []models.Transaction) error
+	PredictFraud(transactions []models.Transaction) ([]models.Transaction, error)
 }
 
 type GfFraudService struct {
@@ -24,9 +24,10 @@ func NewFraudService(dispatcher events.EventDispatcher) *GfFraudService {
 	}
 }
 
-func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error {
+func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
+	failedTransactions := make(chan models.Transaction, len(transactions))
 
 	for _, txn := range transactions {
 		wg.Add(1)
@@ -35,12 +36,14 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 			isFraud, err := predictFraud(txn)
 			if err != nil {
 				errorResults <- err
+				failedTransactions <- txn
 			}
 
 			if isFraud {
 				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
 				if err != nil {
 					errorResults <- err
+					failedTransactions <- txn
 				}
 			}
 		}(txn)
@@ -48,7 +51,7 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) error 
 	wg.Wait()
 	close(errorResults)
 
-	return middleware.MergeErrors(errorResults)
+	return channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
 }
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm

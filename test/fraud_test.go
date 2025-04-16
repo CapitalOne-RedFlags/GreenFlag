@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -29,9 +30,9 @@ func (m *MockEventDispatcher) DispatchFraudAlertEvent(txn models.Transaction) er
 	return args.Error(0)
 }
 
-func (m *MockFraudService) PredictFraud(transactions []models.Transaction) error {
+func (m *MockFraudService) PredictFraud(transactions []models.Transaction) ([]models.Transaction, error) {
 	args := m.Called(transactions)
-	return args.Error(0)
+	return args.Get(0).([]models.Transaction), args.Error(1)
 }
 
 type PredictFraudTestSuite struct {
@@ -56,10 +57,11 @@ func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	failedTransactions, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error for non-fraud transactions")
+	assert.Empty(suite.T(), failedTransactions)
 }
 
 func (suite *PredictFraudTestSuite) TestFraudDetected() {
@@ -72,10 +74,11 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	failedTransactions, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error when fraud alert is successfully dispatched")
+	assert.Empty(suite.T(), failedTransactions)
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
 }
 
@@ -89,10 +92,11 @@ func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	failedTransactions, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.Error(suite.T(), err, "Should return an error when fraud alert dispatch fails")
+	assert.Len(suite.T(), failedTransactions, 1)
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
 }
 
@@ -109,10 +113,11 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 	fraudService := services.NewFraudService(suite.mockEventDispatcher)
 
 	// Act
-	err := fraudService.PredictFraud(transactions)
+	failedTransactions, err := fraudService.PredictFraud(transactions)
 
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return error for multiple transactions")
+	assert.Empty(suite.T(), failedTransactions)
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
 }
 
@@ -134,14 +139,15 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return([]models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
-	err := handler.ProcessFraudEvent(context.TODO(), event)
+	batchResult, err := handler.ProcessFraudEvent(context.TODO(), event)
 
 	// Assert
 	assert.Nil(suite.T(), err)
+	assert.Empty(suite.T(), batchResult.BatchItemFailures)
 	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
@@ -160,14 +166,42 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return(nil).Once()
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
-	err := handler.ProcessFraudEvent(context.TODO(), event)
+	failedTransactions, err := handler.ProcessFraudEvent(context.TODO(), event)
 
 	// Assert
 	assert.Nil(suite.T(), err)
+	assert.Empty(suite.T(), failedTransactions)
+	suite.mockFraudService.AssertExpectations(suite.T())
+}
+
+func (suite *PredictFraudTestSuite) TestRetryFraudPipeline() {
+	// Arrange
+	testTxn1 := GetTestTransaction("test@example.com")
+	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
+	testTxn3 := GetTestTransaction("test@example.com")
+	shouldSucceed := []models.Transaction{testTxn1, testTxn2}
+
+	event := events.SQSEvent{
+		Records: []events.SQSMessage{
+			getSQSEventRecord(testTxn1),
+			getSQSEventRecord(testTxn2),
+			getSQSEventRecord(testTxn3),
+		},
+	}
+
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, nil).Once()
+	handler := handlers.NewFraudRetryHandler(suite.mockFraudService)
+
+	// Act
+	failedTransactions, err := handler.ProcessDLQFraudEvent(context.TODO(), event)
+
+	// Assert
+	assert.Nil(suite.T(), err)
+	assert.Empty(suite.T(), failedTransactions)
 	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
@@ -182,5 +216,17 @@ func getDynamoDBEventRecord(txn models.Transaction, dbEventType string) events.D
 		Change: events.DynamoDBStreamRecord{
 			NewImage: txn.ToDynamoDBAttributeValueMap(),
 		},
+	}
+}
+
+func getSQSEventRecord(txn models.Transaction) events.SQSMessage {
+	res, err := json.Marshal(txn)
+	if err != nil {
+		panic(err)
+	}
+
+	return events.SQSMessage{
+		MessageId: uuid.New().String(),
+		Body:      string(res),
 	}
 }

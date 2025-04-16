@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	gfEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	GFEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
@@ -20,7 +20,7 @@ func NewTransactionProcessingHandler(service *services.TransactionService) *Tran
 	}
 }
 
-func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*gfEvents.BatchResult, error) {
+func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*GFEvents.BatchResult, error) {
 	var errorResults []error
 	var failedRIDs []string
 	var transactions []models.Transaction

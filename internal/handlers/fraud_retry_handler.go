@@ -3,31 +3,51 @@ package handlers
 import (
 	"context"
 
+	GFEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/events"
 )
 
 type FraudRetryHandler struct {
-	service services.FraudService
+	FraudService services.FraudService
 }
 
 func NewFraudRetryHandler(fraudService services.FraudService) *FraudRetryHandler {
 	return &FraudRetryHandler{
-		service: fraudService,
+		FraudService: fraudService,
 	}
 }
 
-func (frh *FraudRetryHandler) ProcessDLQFraudEvent(ctx context.Context, event events.SQSEvent) error {
+func (frh *FraudRetryHandler) ProcessDLQFraudEvent(ctx context.Context, event events.SQSEvent) (*GFEvents.BatchResult, error) {
+	var errorResults []error
+	var failedRIDs []string
 	var transactions []models.Transaction
+	messageIdsByTransactionId := make(map[string]string)
+
 	for _, record := range event.Records {
 		txn, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
-			return err
+			errorResults = append(errorResults, err)
+			failedRIDs = append(failedRIDs, record.MessageId)
 		}
 
 		transactions = append(transactions, *txn)
+		messageIdsByTransactionId[txn.TransactionID] = record.MessageId
 	}
 
-	return frh.service.PredictFraud(transactions)
+	failedTransactions, err := frh.FraudService.PredictFraud(transactions)
+	if err != nil {
+		errorResults = append(errorResults, err)
+	}
+
+	batchResultInput := &middleware.GetBatchResultInput{
+		FailedTransactions:  failedTransactions,
+		RIDsByTransactionId: messageIdsByTransactionId,
+		FailedRIDs:          failedRIDs,
+		Errors:              errorResults,
+	}
+
+	return middleware.GetBatchResult(batchResultInput)
 }
