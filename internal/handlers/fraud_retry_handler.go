@@ -37,7 +37,7 @@ func (frh *FraudRetryHandler) ProcessDLQFraudEvent(ctx context.Context, event ev
 		messageIdsByTransactionId[txn.TransactionID] = record.MessageId
 	}
 
-	failedTransactions, err := frh.FraudService.PredictFraud(transactions)
+	_, failedTransactions, err := frh.FraudService.PredictFraud(transactions)
 	if err != nil {
 		errorResults = append(errorResults, err)
 	}
