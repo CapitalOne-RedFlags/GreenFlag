@@ -246,7 +246,7 @@ func (suite *TransactionPipelineTestSuite) TestTransactionHandler_PartialBatchFa
 	suite.mockTransactionService.AssertExpectations(suite.T())
 }
 
-func (suite *TransactionPipelineTestSuite) TestTransactionHandler_ShouldFail_WithInvalidTransactionBody() {
+func (suite *TransactionPipelineTestSuite) TestTransactionHandler_ShouldPartialFail_WithInvalidTransactionBody() {
 	// Arrange
 	testTxn1 := GetTestTransaction("test@example.com")
 	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
@@ -274,7 +274,7 @@ func (suite *TransactionPipelineTestSuite) TestTransactionHandler_ShouldFail_Wit
 		serviceArgs,
 	).Return(
 		[]models.Transaction{},
-		errors.New("Test"),
+		nil,
 	).Once()
 
 	expectedRIDs := []string{eventRecord3.MessageId}

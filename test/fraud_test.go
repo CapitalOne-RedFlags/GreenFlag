@@ -271,6 +271,51 @@ func (suite *PredictFraudTestSuite) TestRetryFraudPipeline_PartialBatchFailure()
 	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
+func (suite *PredictFraudTestSuite) TestFraudRetryHandler_ShouldPartialFail_WithInvalidTransactionBody() {
+	// Arrange
+	testTxn1 := GetTestTransaction("test@example.com")
+	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
+	testTxn3 := GetTestTransaction("test@wisc.edu")
+	serviceArgs := []models.Transaction{testTxn1, testTxn2}
+
+	eventRecord1 := getSQSEventRecord(testTxn1)
+	eventRecord2 := getSQSEventRecord(testTxn2)
+	eventRecord3 := getSQSEventRecord(testTxn3)
+
+	event := events.SQSEvent{
+		Records: []events.SQSMessage{
+			eventRecord1,
+			eventRecord2,
+			events.SQSMessage{
+				MessageId: eventRecord3.MessageId,
+				Body:      "Bad Transaction Body",
+			},
+		},
+	}
+
+	suite.mockFraudService.On(
+		"PredictFraud",
+		serviceArgs,
+	).Return(
+		[]models.Transaction{},
+		[]models.Transaction{},
+		nil,
+	).Once()
+
+	expectedRIDs := []string{eventRecord3.MessageId}
+	handler := handlers.NewFraudRetryHandler(suite.mockFraudService)
+
+	// Act
+	batchResult, err := handler.ProcessDLQFraudEvent(context.TODO(), event)
+
+	// Assert
+	assert.NotNil(suite.T(), err)
+	assert.NotNil(suite.T(), batchResult)
+	assert.Len(suite.T(), batchResult.BatchItemFailures, 1)
+	assert.ElementsMatch(suite.T(), batchResult.GetRids(), expectedRIDs)
+	suite.mockFraudService.AssertExpectations(suite.T())
+}
+
 func TestPredictFraudSuite(t *testing.T) {
 	suite.Run(t, new(PredictFraudTestSuite))
 }
