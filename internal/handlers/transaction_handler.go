@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
@@ -29,6 +30,7 @@ func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, re
 
 		result, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
+			fmt.Printf("error Unmarshalling: %s", err)
 			observability.SafeAddError(subSeg, err)
 			subSeg.Close(err)
 			return err

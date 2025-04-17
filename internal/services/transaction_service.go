@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
@@ -18,6 +19,7 @@ func TransactionService(ctx context.Context, transactions []models.Transaction, 
 			defer wg.Done()
 			_, _, err := repository.SaveTransaction(ctx, &result)
 			if err != nil {
+				fmt.Printf("error savign transaction: %s", err)
 				errorResults <- err
 			}
 		}(record)

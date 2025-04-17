@@ -9,23 +9,31 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
+	"github.com/twilio/twilio-go"
+	api "github.com/twilio/twilio-go/rest/api/v2010"
 )
 
 type SNSMessenger interface {
 	SendEmailAlert(transaction models.Transaction) (*sns.PublishOutput, error)
+	SendTextAlert(transaction models.Transaction) error
+	SendTextUpdate(number string, body string) error
 }
 
 type GfSNSMessenger struct {
-	Client    *sns.Client
-	TopicName string
-	TopicArn  string
+	Client         *sns.Client
+	TopicName      string
+	TopicArn       string
+	TwilioUsername string
+	TwilioPassword string
 }
 
-func NewGfSNSMessenger(snsClient *sns.Client, topicName string, topicArn string) *GfSNSMessenger {
+func NewGfSNSMessenger(snsClient *sns.Client, topicName string, topicArn string, twilioUsernmae string, twilioPassword string) *GfSNSMessenger {
 	return &GfSNSMessenger{
-		Client:    snsClient,
-		TopicName: topicName,
-		TopicArn:  topicArn,
+		Client:         snsClient,
+		TopicName:      topicName,
+		TopicArn:       topicArn,
+		TwilioUsername: twilioUsernmae,
+		TwilioPassword: twilioPassword,
 	}
 }
 
@@ -135,4 +143,49 @@ func NewMessageAttributeValue(dataType string, stringValue string) types.Message
 		DataType:    aws.String(dataType),
 		StringValue: aws.String(stringValue),
 	}
+}
+
+func (messenger *GfSNSMessenger) SendTextAlert(transaction models.Transaction) error {
+
+	client := twilio.NewRestClientWithParams(twilio.ClientParams{
+		Username: messenger.TwilioUsername,
+		Password: messenger.TwilioPassword,
+	})
+
+	params := &api.CreateMessageParams{}
+	_, body := transaction.GetFraudEmailContent()
+	params.SetBody(body)
+
+	//ASSIGNED TWILIO PHONE NUMBER
+	params.SetFrom("+18333981458")
+	number := transaction.PhoneNumber
+	params.SetTo(number)
+
+	_, err := client.Api.CreateMessage(params)
+	if err != nil {
+		fmt.Println(err.Error())
+		return err
+	}
+	return nil
+}
+
+func (messenger *GfSNSMessenger) SendTextUpdate(number string, body string) error {
+	client := twilio.NewRestClientWithParams(twilio.ClientParams{
+		Username: messenger.TwilioUsername,
+		Password: messenger.TwilioPassword,
+	})
+
+	params := &api.CreateMessageParams{}
+	params.SetBody(body)
+
+	//ASSIGNED TWILIO PHONE NUMBER
+	params.SetFrom("+18333981458")
+	params.SetTo(number)
+
+	_, err := client.Api.CreateMessage(params)
+	if err != nil {
+		fmt.Println(err.Error())
+		return err
+	}
+	return nil
 }
