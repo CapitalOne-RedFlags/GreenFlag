@@ -50,7 +50,10 @@ func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx contex
 
 			observability.SafeAddError(subSeg, err)
 			subSeg.Close(err)
+
+			continue
 		}
+
 		transactions = append(transactions, *transaction)
 		messageIdsByTransactionId[transaction.TransactionID] = record.MessageId
 

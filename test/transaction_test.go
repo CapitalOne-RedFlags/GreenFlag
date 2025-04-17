@@ -246,6 +246,51 @@ func (suite *TransactionPipelineTestSuite) TestTransactionHandler_PartialBatchFa
 	suite.mockTransactionService.AssertExpectations(suite.T())
 }
 
+func (suite *TransactionPipelineTestSuite) TestTransactionHandler_ShouldFail_WithInvalidTransactionBody() {
+	// Arrange
+	testTxn1 := GetTestTransaction("test@example.com")
+	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
+	testTxn3 := GetTestTransaction("test@wisc.edu")
+	serviceArgs := []models.Transaction{testTxn1, testTxn2}
+
+	eventRecord1 := getSQSEventRecord(testTxn1)
+	eventRecord2 := getSQSEventRecord(testTxn2)
+	eventRecord3 := getSQSEventRecord(testTxn3)
+
+	event := events.SQSEvent{
+		Records: []events.SQSMessage{
+			eventRecord1,
+			eventRecord2,
+			events.SQSMessage{
+				MessageId: eventRecord3.MessageId,
+				Body:      "Bad Transaction Body",
+			},
+		},
+	}
+
+	suite.mockTransactionService.On(
+		"TransactionService",
+		mock.Anything,
+		serviceArgs,
+	).Return(
+		[]models.Transaction{},
+		errors.New("Test"),
+	).Once()
+
+	expectedRIDs := []string{eventRecord3.MessageId}
+	handler := handlers.NewTransactionProcessingHandler(suite.mockTransactionService)
+
+	// Act
+	batchResult, err := handler.TransactionProcessingHandler(context.TODO(), event)
+
+	// Assert
+	assert.NotNil(suite.T(), err)
+	assert.NotNil(suite.T(), batchResult)
+	assert.Len(suite.T(), batchResult.BatchItemFailures, 1)
+	assert.ElementsMatch(suite.T(), batchResult.GetRids(), expectedRIDs)
+	suite.mockTransactionService.AssertExpectations(suite.T())
+}
+
 // Run All Tests
 func TestTransactionPipelineTestSuite(t *testing.T) {
 	suite.Run(t, new(TransactionPipelineTestSuite))

@@ -30,6 +30,8 @@ func (frh *FraudRetryHandler) ProcessDLQFraudEvent(ctx context.Context, event ev
 		if err != nil {
 			errorResults = append(errorResults, err)
 			failedRIDs = append(failedRIDs, record.MessageId)
+
+			continue
 		}
 
 		transactions = append(transactions, *txn)

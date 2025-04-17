@@ -59,6 +59,8 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 
 			observability.SafeAddError(procSeg, err)
 			procSeg.Close(err)
+
+			continue
 		}
 
 		transactions = append(transactions, *transaction)
