@@ -139,7 +139,7 @@ func (suite *PredictFraudTestSuite) TestHandleRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return([]models.Transaction{}, nil).Once()
+	suite.mockFraudService.On("PredictFraud", []models.Transaction{testTxn1}).Return([]models.Transaction{}, []models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
@@ -166,7 +166,7 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, nil).Once()
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, []models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
 	// Act
@@ -193,7 +193,7 @@ func (suite *PredictFraudTestSuite) TestRetryFraudPipeline() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, nil).Once()
+	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, []models.Transaction{}, nil).Once()
 	handler := handlers.NewFraudRetryHandler(suite.mockFraudService)
 
 	// Act
