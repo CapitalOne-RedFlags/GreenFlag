@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	GFEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/observability"
@@ -27,7 +26,7 @@ func NewFraudHandler(fraudService services.FraudService) *GfFraudHandler {
 	}
 }
 
-func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.DynamoDBEvent) (*GFEvents.BatchResult, error) {
+func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.DynamoDBEvent) (*models.BatchResult, error) {
 	var errorResults []error
 	var failedRIDs []string
 

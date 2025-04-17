@@ -239,7 +239,11 @@ Resources:
       BuildMethod: makefile
 
   ########################################
-  # (5) Fraud Pipeline Dead Letter Queue
+  # (5) Response Pipeline
+  ########################################
+
+  ########################################
+  # (6) Fraud Pipeline Dead Letter Queue
   ########################################
   FraudDLQ:
     Type: AWS::SQS::Queue
@@ -247,7 +251,7 @@ Resources:
       QueueName: FraudDLQ
 
   ########################################
-  # (6) Response Pipeline Dead Letter Queue
+  # (7) Response Pipeline Dead Letter Queue
   ########################################
   ResponseDLQ:
     Type: AWS::SQS::Queue
@@ -255,7 +259,7 @@ Resources:
       QueueName: ResponseDLQ
 
   ########################################
-  # (7) TransactionPipelineRetryFunction
+  # (8) TransactionPipelineRetryFunction
   ########################################
   TransactionPipelineRetryFunction:
     Type: AWS::Serverless::Function
@@ -297,7 +301,7 @@ Resources:
       BuildMethod: makefile
 
   ########################################
-  # (4) FraudPipelineRetryFunction
+  # (9) FraudPipelineRetryFunction
   ########################################
   FraudPipelineRetryFunction:
     Type: AWS::Serverless::Function

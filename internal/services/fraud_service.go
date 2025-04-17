@@ -29,7 +29,7 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]mod
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
 	failedTransactions := make(chan models.Transaction, len(transactions))
-	fraudResults := make(chan models.Transaction, len(transactions))
+	fraudulentTransactions := make(chan models.Transaction, len(transactions))
 
 	for _, txn := range transactions {
 		wg.Add(1)
@@ -43,7 +43,7 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]mod
 			}
 
 			if isFraud {
-				fraudResults <- txn
+				fraudulentTransactions <- txn
 				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
 				if err != nil {
 					wrappedErr := fmt.Errorf("fraud prediction failed for transaction %s (account: %s, amount: %.2f, merchant: %s, email: %s): %w",
@@ -63,15 +63,9 @@ func (fs *GfFraudService) PredictFraud(transactions []models.Transaction) ([]mod
 	wg.Wait()
 	close(errorResults)
 	close(failedTransactions)
-	close(fraudResults)
+	close(fraudulentTransactions)
 
-	// Collect fraud transactions
-	var fraudulentTransactions []models.Transaction
-	for txn := range fraudResults {
-		fraudulentTransactions = append(fraudulentTransactions, txn)
-	}
-
-	return fraudulentTransactions, channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
+	return channelToSlice(fraudulentTransactions), channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
 }
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm

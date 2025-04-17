@@ -1,11 +1,11 @@
 package test
 
 import (
-	"context"
-	"testing"
+	"encoding/json"
 	"time"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/google/uuid"
 )
 
@@ -33,23 +33,25 @@ func GetTestTransaction(email string) models.Transaction {
 	}
 }
 
-// Wrapper function for a test to fail after specified amount of time
-func RunTestWithCustomTimeout(t *testing.T, seconds time.Duration, name string, testFunc func(*testing.T)) {
-	t.Helper()
+func getDynamoDBEventRecord(txn models.Transaction, dbEventType string) events.DynamoDBEventRecord {
+	return events.DynamoDBEventRecord{
+		EventID:   uuid.New().String(),
+		EventName: dbEventType,
+		Change: events.DynamoDBStreamRecord{
+			SequenceNumber: uuid.New().String(),
+			NewImage:       txn.ToDynamoDBAttributeValueMap(),
+		},
+	}
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), seconds*time.Second)
-	defer cancel()
+func getSQSEventRecord(txn models.Transaction) events.SQSMessage {
+	res, err := json.Marshal(txn)
+	if err != nil {
+		panic(err)
+	}
 
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-
-		t.Run(name, testFunc)
-	}()
-	select {
-	case <-done:
-
-	case <-ctx.Done():
-		t.Fatal("Test timed out")
+	return events.SQSMessage{
+		MessageId: uuid.New().String(),
+		Body:      string(res),
 	}
 }

@@ -3,7 +3,6 @@ package middleware
 import (
 	"errors"
 
-	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
 
@@ -23,22 +22,22 @@ type GetBatchResultInput struct {
 	Errors              []error
 }
 
-func GetBatchResult(input *GetBatchResultInput) (*events.BatchResult, error) {
-	var results []events.BatchItemFailure
+func GetBatchResult(input *GetBatchResultInput) (*models.BatchResult, error) {
+	var results []models.BatchItemFailure
 
 	for _, txn := range input.FailedTransactions {
-		results = append(results, events.BatchItemFailure{
+		results = append(results, models.BatchItemFailure{
 			ItemIdentifier: input.RIDsByTransactionId[txn.TransactionID],
 		})
 	}
 
 	for _, rid := range input.FailedRIDs {
-		results = append(results, events.BatchItemFailure{
+		results = append(results, models.BatchItemFailure{
 			ItemIdentifier: rid,
 		})
 	}
 
-	return &events.BatchResult{
+	return &models.BatchResult{
 		BatchItemFailures: results,
 	}, errors.Join(input.Errors...)
 }

@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -45,22 +47,33 @@ func (m *MockTransactionRepository) DeleteTransaction(ctx context.Context, accou
 	return args.Error(0)
 }
 
+type MockTransactionService struct {
+	mock.Mock
+}
+
+func (m *MockTransactionService) TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
+	args := m.Called(ctx, transactions)
+	return args.Get(0).([]models.Transaction), args.Error(1)
+}
+
 // ✅ Define Test Suite
-type TransactionServiceTestSuite struct {
+type TransactionPipelineTestSuite struct {
 	suite.Suite
-	testRepo TransactionRepositoryTestSuite
-	mockRepo *MockTransactionRepository
-	ctx      context.Context
+	testRepo               TransactionRepositoryTestSuite
+	mockRepo               *MockTransactionRepository
+	mockTransactionService *MockTransactionService
+	ctx                    context.Context
 }
 
 // 🔄 Setup Before Each Test
-func (suite *TransactionServiceTestSuite) SetupTest() {
+func (suite *TransactionPipelineTestSuite) SetupTest() {
 	suite.mockRepo = &MockTransactionRepository{}
+	suite.mockTransactionService = &MockTransactionService{}
 	suite.ctx = context.Background()
 }
 
 // ✅ Test Case: Successfully Saves Valid Transactions
-func (suite *TransactionServiceTestSuite) TestTransactionService_Success() {
+func (suite *TransactionPipelineTestSuite) TestTransactionService_Success() {
 
 	transactions := []models.Transaction{
 		{TransactionID: "tx1", AccountID: "acc123", CustomerAge: 26, TransactionAmount: 100.50, PhoneNumber: "+12025550179", Email: "test@example.com"},
@@ -82,7 +95,7 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_Success() {
 }
 
 // Test Case: Save Fails Due to DynamoDB Error
-func (suite *TransactionServiceTestSuite) TestTransactionService_SaveError() {
+func (suite *TransactionPipelineTestSuite) TestTransactionService_SaveError() {
 	transactions := []models.Transaction{
 		{TransactionID: "tx1", AccountID: "acc123", TransactionAmount: 100.50, CustomerAge: 26, PhoneNumber: "+12025550179", Email: "test@example.com"},
 	}
@@ -100,7 +113,7 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_SaveError() {
 	assert.Len(suite.T(), failedTransactions, 1)
 }
 
-func (suite *TransactionServiceTestSuite) TestTransactionService_NoTransaction() {
+func (suite *TransactionPipelineTestSuite) TestTransactionService_NoTransaction() {
 	var transactions []models.Transaction
 	// Call `TransactionService`
 	service := services.NewTransactionService(suite.mockRepo)
@@ -112,7 +125,7 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_NoTransaction()
 	assert.Empty(suite.T(), failedTransactions)
 }
 
-func (suite *TransactionServiceTestSuite) TestTransactionService_ParitalFail() {
+func (suite *TransactionPipelineTestSuite) TestTransactionService_ParitalFail() {
 
 	transactions := []models.Transaction{
 		{TransactionID: "tx1", AccountID: "acc123", CustomerAge: 26, TransactionAmount: 100.50, PhoneNumber: "+12025550179", Email: "test@example.com"},
@@ -131,7 +144,7 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_ParitalFail() {
 	assert.Len(suite.T(), failedTransactions, 1)
 }
 
-func (suite *TransactionServiceTestSuite) TestTransactionService_MultipuleFailures() {
+func (suite *TransactionPipelineTestSuite) TestTransactionService_MultipuleFailures() {
 
 	transactions := []models.Transaction{
 		{TransactionID: "tx1", AccountID: "acc123", CustomerAge: 26, TransactionAmount: 100.50, PhoneNumber: "+12025550179", Email: "test@example.com"},
@@ -150,7 +163,7 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_MultipuleFailur
 	assert.Len(suite.T(), failedTransactions, 2)
 }
 
-func (suite *TransactionServiceTestSuite) TestTransactionService_integration() {
+func (suite *TransactionPipelineTestSuite) TestTransactionService_integration() {
 	suite.testRepo.SetupSuite()
 
 	var testTransaction []models.Transaction
@@ -191,7 +204,41 @@ func (suite *TransactionServiceTestSuite) TestTransactionService_integration() {
 	assert.Equal(suite.T(), testTransaction[0], *res)
 }
 
+func (suite *TransactionPipelineTestSuite) TestTransactionHandler_PartialBatchFailure() {
+	// Arrange
+	testTxn1 := GetTestTransaction("test@example.com")
+	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
+	testTxn3 := GetTestTransaction("test@example.com")
+	serviceArgs := []models.Transaction{testTxn1, testTxn2, testTxn3}
+
+	eventRecord1 := getSQSEventRecord(testTxn1)
+	eventRecord2 := getSQSEventRecord(testTxn2)
+	eventRecord3 := getSQSEventRecord(testTxn3)
+
+	event := events.SQSEvent{
+		Records: []events.SQSMessage{
+			eventRecord1,
+			eventRecord2,
+			eventRecord3,
+		},
+	}
+
+	suite.mockTransactionService.On("TransactionService", serviceArgs).Return([]models.Transaction{}, []models.Transaction{testTxn1, testTxn2}, nil).Once()
+	expectedRIDs := []string{eventRecord1.MessageId, eventRecord3.MessageId}
+	handler := handlers.NewTransactionProcessingHandler(suite.mockTransactionService)
+
+	// Act
+	batchResult, err := handler.TransactionProcessingHandler(context.TODO(), event)
+
+	// Assert
+	assert.NotNil(suite.T(), err)
+	assert.NotNil(suite.T(), batchResult)
+	assert.Len(suite.T(), batchResult.BatchItemFailures, 2)
+	assert.ElementsMatch(suite.T(), batchResult.BatchItemFailures, expectedRIDs)
+	suite.mockTransactionService.AssertExpectations(suite.T())
+}
+
 // Run All Tests
-func TestTransactionServiceTestSuite(t *testing.T) {
-	suite.Run(t, new(TransactionServiceTestSuite))
+func TestTransactionPipelineTestSuite(t *testing.T) {
+	suite.Run(t, new(TransactionPipelineTestSuite))
 }

@@ -9,17 +9,21 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
 
-type TransactionService struct {
+type TransactionService interface {
+	TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error)
+}
+
+type GfTransactionService struct {
 	repository db.TransactionRepository
 }
 
-func NewTransactionService(repository db.TransactionRepository) *TransactionService {
-	return &TransactionService{
+func NewTransactionService(repository db.TransactionRepository) *GfTransactionService {
+	return &GfTransactionService{
 		repository: repository,
 	}
 }
 
-func (ts *TransactionService) TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
+func (ts *GfTransactionService) TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
 	failedTransactions := make(chan models.Transaction, len(transactions))

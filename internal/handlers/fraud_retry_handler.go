@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 
-	GFEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
@@ -20,7 +19,7 @@ func NewFraudRetryHandler(fraudService services.FraudService) *FraudRetryHandler
 	}
 }
 
-func (frh *FraudRetryHandler) ProcessDLQFraudEvent(ctx context.Context, event events.SQSEvent) (*GFEvents.BatchResult, error) {
+func (frh *FraudRetryHandler) ProcessDLQFraudEvent(ctx context.Context, event events.SQSEvent) (*models.BatchResult, error) {
 	var errorResults []error
 	var failedRIDs []string
 	var transactions []models.Transaction

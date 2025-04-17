@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	GFEvents "github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/observability"
@@ -17,13 +16,13 @@ type TransactionProcessingHandler struct {
 	service services.TransactionService
 }
 
-func NewTransactionProcessingHandler(service *services.TransactionService) *TransactionProcessingHandler {
+func NewTransactionProcessingHandler(service services.TransactionService) *TransactionProcessingHandler {
 	return &TransactionProcessingHandler{
-		service: *service,
+		service: service,
 	}
 }
 
-func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*GFEvents.BatchResult, error) {
+func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*models.BatchResult, error) {
 	var errorResults []error
 	var failedRIDs []string
 
