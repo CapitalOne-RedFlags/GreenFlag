@@ -49,5 +49,5 @@ func main() {
 	otel.SetTextMapPropagator(xray.Propagator{})
 
 	// Start Lambda with OpenTelemetry instrumentation
-	lambda.Start(otellambda.InstrumentHandler(handler, xrayconfig.WithRecommendedOptions(tp)...))
+	lambda.Start(otellambda.InstrumentHandler(handler.TransactionProcessingHandler, xrayconfig.WithRecommendedOptions(tp)...))
 }

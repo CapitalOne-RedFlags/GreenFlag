@@ -442,7 +442,7 @@ Outputs:
 
   TransactionRetryArn:
     Description: "ARN of the TransactionPipelineRetryFunction"
-    Value: !GetAtt TransactionPipelineRetryeFunction.Arn
+    Value: !GetAtt TransactionPipelineRetryFunction.Arn
 
   FraudRetryArn:
     Description: "ARN of the FraudPipelineRetryFunction"
