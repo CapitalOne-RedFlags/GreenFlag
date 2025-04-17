@@ -194,7 +194,7 @@ Resources:
               - ReportBatchItemFailures
       DeadLetterQueue:
         Type: SQS
-        TargetArn: !Ref TransactionDLQARN
+        TargetArn: !GetAtt FraudDLQ.Arn
       Environment:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
@@ -255,6 +255,10 @@ Resources:
                 - sns:Subscribe
                 - sns:Publish
               Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt FraudDLQ.Arn
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
@@ -369,6 +373,10 @@ Resources:
                 - sqs:DeleteMessage
                 - sqs:GetQueueAttributes
               Resource: !Ref TransactionDLQARN
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
       Events:
         SQSEvent:
           Type: SQS
