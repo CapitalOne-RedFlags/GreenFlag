@@ -223,8 +223,16 @@ func (suite *TransactionPipelineTestSuite) TestTransactionHandler_PartialBatchFa
 		},
 	}
 
-	suite.mockTransactionService.On("TransactionService", serviceArgs).Return([]models.Transaction{}, []models.Transaction{testTxn1, testTxn2}, nil).Once()
-	expectedRIDs := []string{eventRecord1.MessageId, eventRecord3.MessageId}
+	suite.mockTransactionService.On(
+		"TransactionService",
+		mock.Anything,
+		serviceArgs,
+	).Return(
+		[]models.Transaction{testTxn1, testTxn2},
+		errors.New("test"),
+	).Once()
+
+	expectedRIDs := []string{eventRecord1.MessageId, eventRecord2.MessageId}
 	handler := handlers.NewTransactionProcessingHandler(suite.mockTransactionService)
 
 	// Act
@@ -234,7 +242,7 @@ func (suite *TransactionPipelineTestSuite) TestTransactionHandler_PartialBatchFa
 	assert.NotNil(suite.T(), err)
 	assert.NotNil(suite.T(), batchResult)
 	assert.Len(suite.T(), batchResult.BatchItemFailures, 2)
-	assert.ElementsMatch(suite.T(), batchResult.BatchItemFailures, expectedRIDs)
+	assert.ElementsMatch(suite.T(), batchResult.GetRids(), expectedRIDs)
 	suite.mockTransactionService.AssertExpectations(suite.T())
 }
 

@@ -176,12 +176,12 @@ func (suite *PredictFraudTestSuite) TestHandleMultipleTransactionRequest() {
 	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
-func (suite *PredictFraudTestSuite) TestFraudHandlerPartialBatchFailure() {
+func (suite *PredictFraudTestSuite) TestFraudHandler_PartialBatchFailure() {
 	// Arrange
 	testTxn1 := GetTestTransaction("test@example.com")
 	testTxn2 := GetTestTransaction("jpoconnell4@wisc.edu")
 	testTxn3 := GetTestTransaction("test@example.com")
-	shouldSucceed := []models.Transaction{testTxn1, testTxn2}
+	serviceArgs := []models.Transaction{testTxn1, testTxn2, testTxn3}
 
 	eventRecord1 := getDynamoDBEventRecord(testTxn1, "INSERT")
 	eventRecord2 := getDynamoDBEventRecord(testTxn2, "INSERT")
@@ -195,7 +195,7 @@ func (suite *PredictFraudTestSuite) TestFraudHandlerPartialBatchFailure() {
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", shouldSucceed).Return([]models.Transaction{}, []models.Transaction{testTxn1, testTxn2}, nil).Once()
+	suite.mockFraudService.On("PredictFraud", serviceArgs).Return([]models.Transaction{}, []models.Transaction{testTxn1, testTxn3}, errors.New("Test")).Once()
 	expectedRIDs := []string{eventRecord1.Change.SequenceNumber, eventRecord3.Change.SequenceNumber}
 	handler := handlers.NewFraudHandler(suite.mockFraudService)
 
@@ -206,7 +206,7 @@ func (suite *PredictFraudTestSuite) TestFraudHandlerPartialBatchFailure() {
 	assert.NotNil(suite.T(), err)
 	assert.NotNil(suite.T(), batchResult)
 	assert.Len(suite.T(), batchResult.BatchItemFailures, 2)
-	assert.ElementsMatch(suite.T(), batchResult.BatchItemFailures, expectedRIDs)
+	assert.ElementsMatch(suite.T(), batchResult.GetRids(), expectedRIDs)
 	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
@@ -256,7 +256,8 @@ func (suite *PredictFraudTestSuite) TestRetryFraudPipeline_PartialBatchFailure()
 		},
 	}
 
-	suite.mockFraudService.On("PredictFraud", serviceArgs).Return([]models.Transaction{}, []models.Transaction{testTxn2, testTxn3}, nil).Once()
+	suite.mockFraudService.On("PredictFraud", serviceArgs).Return([]models.Transaction{}, []models.Transaction{testTxn2, testTxn3}, errors.New("Test")).Once()
+	expectedRIDs := []string{eventRecord2.MessageId, eventRecord3.MessageId}
 	handler := handlers.NewFraudRetryHandler(suite.mockFraudService)
 
 	// Act
@@ -266,7 +267,7 @@ func (suite *PredictFraudTestSuite) TestRetryFraudPipeline_PartialBatchFailure()
 	assert.NotNil(suite.T(), err)
 	assert.NotNil(suite.T(), batchResult)
 	assert.Len(suite.T(), batchResult.BatchItemFailures, 2)
-	assert.ElementsMatch(suite.T(), batchResult.BatchItemFailures, []string{eventRecord2.MessageId, eventRecord3.MessageId})
+	assert.ElementsMatch(suite.T(), batchResult.GetRids(), expectedRIDs)
 	suite.mockFraudService.AssertExpectations(suite.T())
 }
 
