@@ -13,6 +13,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig"
+	"go.opentelemetry.io/contrib/propagators/aws/xray"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -36,11 +40,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create SNS topic: %s\n", err)
 	}
+	// Initialize OpenTelemetry
+	tp, err := xrayconfig.NewTracerProvider(context)
+	if err != nil {
+		log.Fatalf("Error initializing OpenTelemetry tracer provider: %s\n", err)
+	}
+
+	defer func() {
+		err := tp.Shutdown(context)
+		if err != nil {
+			log.Fatalf("Error shutting down OpenTelemetry tracer provider: %s\n", err)
+		}
+	}()
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(xray.Propagator{})
 
 	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twiilioPassword)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
 	fraudService := services.NewFraudService(eventDispatcher, repository)
 	fraudHandler := handlers.NewFraudHandler(fraudService)
 
-	lambda.Start(fraudHandler.ProcessFraudEvent)
+	lambda.Start(otellambda.InstrumentHandler(fraudHandler.ProcessFraudEvent, xrayconfig.WithRecommendedOptions(tp)...))
 }

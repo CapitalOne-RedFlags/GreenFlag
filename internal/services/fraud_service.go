@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"slices"
@@ -13,7 +14,7 @@ import (
 )
 
 type FraudService interface {
-	PredictFraud(ctx context.Context, transactions []models.Transaction) error
+	PredictFraud(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error)
 }
 
 type GfFraudService struct {
@@ -28,9 +29,10 @@ func NewFraudService(dispatcher events.EventDispatcher, repo db.TransactionRepos
 	}
 }
 
-func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []models.Transaction) error {
+func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
+	fraudResults := make(chan models.Transaction, len(transactions))
 
 	for _, txn := range transactions {
 		wg.Add(1)
@@ -39,12 +41,22 @@ func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []model
 			isFraud, err := predictFraud(txn)
 			if err != nil {
 				errorResults <- err
+				return
 			}
 
 			if isFraud {
+				fraudResults <- txn
 				err := fs.EventDispatcher.DispatchFraudAlertEvent(txn)
 				if err != nil {
-					errorResults <- err
+					wrappedErr := fmt.Errorf("fraud prediction failed for transaction %s (account: %s, amount: %.2f, merchant: %s, email: %s): %w",
+						txn.TransactionID,
+						txn.AccountID,
+						txn.TransactionAmount,
+						txn.MerchantID,
+						txn.Email,
+						err)
+					errorResults <- wrappedErr
+					return
 				} else {
 					txn.TransactionStatus = "POTENTIAL_FRAUD"
 					_, err := fs.TransactionRepo.UpdateTransaction(
@@ -54,7 +66,15 @@ func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []model
 						&txn,
 					)
 					if err != nil {
-						errorResults <- err
+						wrappedErr := fmt.Errorf("fraud prediction failed for transaction %s (account: %s, amount: %.2f, merchant: %s, email: %s): %w",
+							txn.TransactionID,
+							txn.AccountID,
+							txn.TransactionAmount,
+							txn.MerchantID,
+							txn.Email,
+							err)
+						errorResults <- wrappedErr
+						return
 					}
 				}
 			} else {
@@ -66,15 +86,30 @@ func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []model
 					&txn,
 				)
 				if err != nil {
-					errorResults <- err
+					wrappedErr := fmt.Errorf("fraud prediction failed for transaction %s (account: %s, amount: %.2f, merchant: %s, email: %s): %w",
+						txn.TransactionID,
+						txn.AccountID,
+						txn.TransactionAmount,
+						txn.MerchantID,
+						txn.Email,
+						err)
+					errorResults <- wrappedErr
+					return
 				}
 			}
 		}(txn)
 	}
 	wg.Wait()
 	close(errorResults)
+	close(fraudResults)
 
-	return middleware.MergeErrors(errorResults)
+	// Collect fraud transactions
+	var fraudulentTransactions []models.Transaction
+	for txn := range fraudResults {
+		fraudulentTransactions = append(fraudulentTransactions, txn)
+	}
+
+	return fraudulentTransactions, middleware.MergeErrors(errorResults)
 }
 
 // Placeholder for fraud prediction, to be replaced with prediction algorithm

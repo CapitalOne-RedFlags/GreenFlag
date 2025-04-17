@@ -33,6 +33,6 @@ func (rh *GfResponseHandler) ProcessResponseEvent(ctx context.Context, event eve
 		}
 		messages = append(messages, *result)
 	}
-	_, err := rh.responseService.UpdateTransaction(ctx, messages)
+	_, err := rh.responseService.RsUpdateTransaction(ctx, messages)
 	return err
 }

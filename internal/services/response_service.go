@@ -12,7 +12,7 @@ import (
 )
 
 type ResponseService interface {
-	UpdateTransaction(ctx context.Context, messages []models.TwilioMessage) ([]models.TwilioMessage, error)
+	RsUpdateTransaction(ctx context.Context, messages []models.TwilioMessage) ([]models.TwilioMessage, error)
 }
 
 type GfResponseService struct {
@@ -34,7 +34,7 @@ func NewGfResponseService(dispatcher events.EventDispatcher, repo db.Transaction
 	}
 }
 
-func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []models.TwilioMessage) ([]models.TwilioMessage, error) {
+func (rs *GfResponseService) RsUpdateTransaction(ctx context.Context, messages []models.TwilioMessage) ([]models.TwilioMessage, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(messages))
 	failedMessages := make(chan models.TwilioMessage, len(messages))
@@ -99,6 +99,7 @@ func (rs *GfResponseService) UpdateTransaction(ctx context.Context, messages []m
 	}
 	wg.Wait()
 	close(errorResults)
+	close(failedMessages)
 
 	return channelToSlice(failedMessages), middleware.MergeErrors(errorResults)
 }
