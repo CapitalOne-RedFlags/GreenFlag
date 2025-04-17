@@ -21,6 +21,10 @@ Parameters:
     Type: String
     Description: ARN of the SQS dead letter queue holding transaction messages
 
+  ResponseQueueArn:
+    Type: String
+    Description: ARN of the SQS queue holding response messages
+
   DynamoDBTableName:
     Type: String
     Description: Name of the DynamoDB table
@@ -54,6 +58,8 @@ Resources:
           AttributeType: S
         - AttributeName: TransactionID
           AttributeType: S
+        - AttributeName: PhoneNumber
+          AttributeType: S
       KeySchema:
         - AttributeName: AccountID
           KeyType: HASH
@@ -62,6 +68,13 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
+      GlobalSecondaryIndexes:
+        - IndexName: PhoneNumberIndex
+          KeySchema:
+            - AttributeName: PhoneNumber
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   ########################################
   # (2) SNS Topic for Fraud Alerts
@@ -142,6 +155,10 @@ Resources:
                 - sqs:DeleteMessage
                 - sqs:GetQueueAttributes
               Resource: !Ref TransactionQueueARN
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
       Events:
         SQSEvent:
           Type: SQS
@@ -165,19 +182,6 @@ Resources:
       Handler: bootstrap
       Runtime: provided.al2
       
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSXrayWriteOnlyAccess
-        - Statement:
-            - Effect: Allow
-              Action:
-                - sns:CreateTopic
-                - sns:Subscribe
-                - sns:Publish
-                - sqs:SendMessage
-              Resource:
-                - !Ref NotificationTopic
-                - !GetAtt FraudDLQ.Arn 
       Events:
         DynamoDBStream:
           Type: DynamoDB
@@ -191,10 +195,9 @@ Resources:
       DeadLetterQueue:
         Type: SQS
         TargetArn: !Ref TransactionDLQARN
-      Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-collector-amd64-ver-0-115-0:3"
       Environment:
         Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
           OTEL_CONFIG_CONTENT: |
             receivers:
               otlp:
@@ -234,13 +237,91 @@ Resources:
               telemetry:
                 logs:
                   level: "info"
+      
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sns:CreateTopic
+                - sns:Subscribe
+                - sns:Publish
+              Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-collector-amd64-ver-0-115-0:3"
       Tracing: Active
     Metadata:
       BuildMethod: makefile
 
-  ########################################
-  # (5) Response Pipeline
-  ########################################
+  # ########################################
+  # # (5) SQS Queue and ResponsePipelineFunction
+  # ########################################
+
+  ResponsePipelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ResponsePipelineFunction
+      CodeUri: ../
+      Handler: bootstrap 
+      Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+      EphemeralStorage:
+        Size: 512
+
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+                - dynamodb:Query 
+              Resource: 
+                - !GetAtt TransactionsTable.Arn
+                - !Sub "${TransactionsTable.Arn}/index/PhoneNumberIndex"
+
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:SendMessage
+              Resource: !Ref ResponseQueueArn
+            - Effect: Allow
+              Action:
+                - sns:CreateTopic
+                - sns:Subscribe
+                - sns:Publish
+              Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref ResponseQueueArn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+    Metadata:
+      BuildMethod: makefile
 
   ########################################
   # (6) Fraud Pipeline Dead Letter Queue
@@ -354,6 +435,10 @@ Outputs:
   FraudPipelineArn:
     Description: "ARN of the FraudPipelineFunction"
     Value: !GetAtt FraudPipelineFunction.Arn
+  
+  ResponsePipelineArn:
+    Description: "ARN of the ResponsePipelineFunction"
+    Value: !GetAtt ResponsePipelineFunction.Arn
 
   TransactionRetryArn:
     Description: "ARN of the TransactionPipelineRetryFunction"

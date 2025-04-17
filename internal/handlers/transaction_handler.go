@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
@@ -45,6 +46,7 @@ func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx contex
 
 		transaction, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
+			fmt.Printf("error Unmarshalling: %s", err)
 			errorResults = append(errorResults, err)
 			failedRIDs = append(failedRIDs, record.MessageId)
 

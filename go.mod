@@ -7,14 +7,17 @@ toolchain go1.24.1
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.62
-	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.7
-	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.41.1
+	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.10
+	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.7.77
+	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.42.2
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.3
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.38.1
 	github.com/aws/aws-xray-sdk-go v1.8.5
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.10.0
+	github.com/twilio/twilio-go v1.25.1
 	go.opentelemetry.io/contrib/detectors/aws/ecs v1.35.0
 	go.opentelemetry.io/contrib/detectors/aws/lambda v0.60.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.60.0
@@ -30,7 +33,7 @@ require (
 	github.com/aws/aws-sdk-go v1.47.9 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.25.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.25.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.29.1 // indirect
@@ -42,6 +45,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.17.6 // indirect

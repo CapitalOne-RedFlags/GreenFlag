@@ -15,7 +15,7 @@ FRAUD_SRC=$(ROOT_DIR)/cmd/lambda/fraud
 TRANSACTION_FUNCTION=TransactionPipelineFunction
 FRAUD_FUNCTION=FraudPipelineFunction
 STACK_NAME=TransactionConsumerStack
-PROFILE=CS620_C1_Capstone_Rex
+PROFILE=AdministratorAccess-140023383737
 TEMPLATE_FILE=$(ROOT_DIR)/deployments/template.yaml
 
 
@@ -38,6 +38,13 @@ build-FraudPipelineFunction:
 	mkdir -p $(ARTIFACTS_DIR)
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -tags lambda.norpc -o $(ARTIFACTS_DIR)/bootstrap ./cmd/lambda/fraud/fraud_pipeline.go
 
+# Build FraudPipelineFunction binary
+.PHONY: build-ResponsePipelineFunction
+build-ResponsePipelineFunction:
+	mkdir -p $(ARTIFACTS_DIR)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -tags lambda.norpc -o $(ARTIFACTS_DIR)/bootstrap ./cmd/lambda/response/response_pipeline.go
+
+
 # Build TransactionPipelineRetryFunction binary
 .PHONY: build-TransactionPipelineRetryFunction
 build-TransactionPipelineRetryFunction:
@@ -52,7 +59,7 @@ build-FraudPipelineRetryFunction:
 
 # Build both functions (invoked by SAM during 'sam build')
 .PHONY: build
-build: build-transaction build-fraud build-TransactionPipelineRetryFunction build-FraudPipelineRetryFunction
+build: build-TransactionPipelineFunction build-FraudPipelineFunction build-ResponsePipelineFunction build-TransactionPipelineRetryFunction build-FraudPipelineRetryFunction
 
 # Run sam build to trigger the Makefile integration.
 .PHONY: sam-build

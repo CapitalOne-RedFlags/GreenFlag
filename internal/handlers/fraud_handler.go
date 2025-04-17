@@ -83,7 +83,7 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	observability.SafeAddMetadata(fraudSeg, observability.KeyEmailsChecked, emailsChecked)
 
 	// Call the fraud service
-	fraudulentTransactions, failedTransactions, err := fh.FraudService.PredictFraud(transactions)
+	fraudulentTransactions, failedTransactions, err := fh.FraudService.PredictFraud(ctx, transactions)
 
 	// Add metadata about fraudulent transactions
 	if len(fraudulentTransactions) > 0 {

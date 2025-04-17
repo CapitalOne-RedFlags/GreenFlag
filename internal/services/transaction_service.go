@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
@@ -34,6 +35,7 @@ func (ts *GfTransactionService) TransactionService(ctx context.Context, transact
 			defer wg.Done()
 			_, _, err := ts.repository.SaveTransaction(ctx, &txn)
 			if err != nil {
+				fmt.Printf("error savign transaction: %s", err)
 				errorResults <- err
 				failedTransactions <- txn
 			}

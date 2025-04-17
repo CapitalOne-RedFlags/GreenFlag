@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/aws/aws-lambda-go/events"
@@ -174,12 +175,28 @@ func (txn *Transaction) ToDynamoDBAttributeValueMap() map[string]events.DynamoDB
 	return avMap
 }
 
+func last4(accountId string) string {
+	if len(accountId) >= 4 {
+		return accountId[len(accountId)-4:]
+	}
+	return accountId
+}
+
+func formatDateTime(dt string) string {
+	t, err := time.Parse(time.RFC3339, dt)
+	if err != nil {
+		return dt // fallback to raw string
+	}
+	return t.Format("Jan 2 at 3:04 PM")
+}
+
 // Get subject, message for an email fraud alert
 func (txn *Transaction) GetFraudEmailContent() (string, string) {
-	return "Suspicious Activity on Your Credit Card", fmt.Sprintf(
-		`"CAPITAL ONE: We detected a suspicious transaction on your card ending in 1234 for $%.2f at StoreXYZ
-on Jan 31 at 3:15 PM. If this was you, reply YES. If not, reply NO or call us at 1-800-XXX-XXXX immediately.
-Do not share your account details with anyone."`, txn.TransactionAmount)
+	return "Suspicious Activity on Your Card", fmt.Sprintf("CAPITAL ONE: We detected a suspicious transaction on your card ending in 1234 for $%.2f at %s on %s. If this was you, reply YES. If not, reply NO or call us immediately.", txn.TransactionAmount,
+		txn.MerchantID,
+		formatDateTime(txn.TransactionDate),
+	)
+
 }
 
 // Converts AWS Lambda event DynamoDBAttributeValue to AWS SDK v2 AttributeValue

@@ -23,6 +23,18 @@ type MockTransactionRepository struct {
 	mock.Mock
 }
 
+// GetFraudTransaction implements db.TransactionRepository.
+func (m *MockTransactionRepository) GetTransactionByNumberAndStatus(ctx context.Context, phoneNumber string, status string) ([]models.Transaction, error) {
+	args := m.Called(ctx, phoneNumber)
+	return nil, args.Error(1)
+}
+
+// UpdateFraudTransaction implements db.TransactionRepository.
+func (m *MockTransactionRepository) UpdateFraudTransaction(ctx context.Context, phoneNumber string, isFraud bool, status string) (int, error) {
+	args := m.Called(ctx, phoneNumber, isFraud)
+	return 1, args.Error(1)
+}
+
 // ✅ Implement `SaveTransaction`
 func (m *MockTransactionRepository) SaveTransaction(ctx context.Context, txn *models.Transaction) (*dynamodb.PutItemOutput, string, error) {
 	args := m.Called(ctx, txn)
