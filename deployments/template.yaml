@@ -190,6 +190,7 @@ Resources:
             StartingPosition: TRIM_HORIZON
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+            MaximumRetryAttempts: 2
             FunctionResponseTypes:
               - ReportBatchItemFailures
       DeadLetterQueue:
@@ -401,20 +402,34 @@ Resources:
       Runtime: provided.al2
       Environment:
         Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
           IS_RETRY: true
 
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
         - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
             - Effect: Allow
               Action:
                 - sns:CreateTopic
                 - sns:Subscribe
                 - sns:Publish
+              Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
                 - sqs:SendMessage
-              Resource:
-                - !Ref NotificationTopic
-                - !GetAtt FraudDLQ.Arn 
+              Resource: !GetAtt FraudDLQ.Arn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
       Events:
         SQSEvent:
           Type: SQS

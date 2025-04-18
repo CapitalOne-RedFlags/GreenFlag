@@ -63,6 +63,16 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 			continue
 		}
 
+		if err := transaction.ValidateTransaction(); err != nil {
+			errorResults = append(errorResults, err)
+			failedRIDs = append(failedRIDs, record.Change.SequenceNumber)
+
+			observability.SafeAddError(procSeg, err)
+			procSeg.Close(err)
+
+			continue
+		}
+
 		transactions = append(transactions, *transaction)
 		transactionIDs = append(transactionIDs, transaction.TransactionID)
 		ridsByTransactionId[transaction.TransactionID] = record.Change.SequenceNumber
