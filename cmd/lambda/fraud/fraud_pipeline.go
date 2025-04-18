@@ -69,7 +69,7 @@ func main() {
 	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twilioPassword)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
 	fraudDetector := fraud_detection.NewGfAWSFraudDetector(fraudDetectorClient)
-	fraudService := services.NewAWSFraudService(eventDispatcher, repository, fraudDetector)
+	fraudService := services.NewFraudService(eventDispatcher, repository, fraudDetector)
 	fraudHandler := handlers.NewFraudHandler(fraudService)
 
 	// Start Lambda with OpenTelemetry instrumentation
