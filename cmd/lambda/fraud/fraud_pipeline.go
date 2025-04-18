@@ -12,7 +12,6 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/messaging"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/lambda"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/frauddetector"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -28,17 +27,17 @@ func main() {
 	context := context.Background()
 
 	// Load AWS configuration
-	awsConfig, err := awsconfig.LoadDefaultConfig(context)
+	awsConfig, err := config.LoadAWSConfig(context)
 	if err != nil {
 		log.Fatalf("Failed to load AWS configuration: %s\n", err)
 	}
 
 	// Initialize AWS clients
 	tableName := config.DBConfig.TableName
-	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConfig), tableName)
+	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConfig.Config), tableName)
 	repository := db.NewTransactionRepository(dbClient)
-	snsClient := sns.NewFromConfig(awsConfig)
-	fraudDetectorClient := frauddetector.NewFromConfig(awsConfig)
+	snsClient := sns.NewFromConfig(awsConfig.Config)
+	fraudDetectorClient := frauddetector.NewFromConfig(awsConfig.Config)
 
 	// Create SNS topic
 	topicName := config.SNSMessengerConfig.TopicName
