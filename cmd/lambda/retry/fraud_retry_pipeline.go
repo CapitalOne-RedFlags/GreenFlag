@@ -7,11 +7,13 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/fraud_detection"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/messaging"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/frauddetector"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 )
 
@@ -26,6 +28,7 @@ func main() {
 	}
 
 	snsClient := sns.NewFromConfig(awsConfig.Config)
+	fraudDetectorClient := frauddetector.NewFromConfig(awsConfig.Config)
 
 	tableName := config.DBConfig.TableName
 	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConfig.Config), tableName)
@@ -41,7 +44,8 @@ func main() {
 	twiilioPassword := config.SNSMessengerConfig.TwilioPassword
 	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twiilioPassword)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
-	fraudService := services.NewFraudService(eventDispatcher, repository)
+	fraudDetector := fraud_detection.NewGfAWSFraudDetector(fraudDetectorClient)
+	fraudService := services.NewFraudService(eventDispatcher, repository, fraudDetector)
 	fraudRetryHandler := handlers.NewFraudRetryHandler(fraudService)
 
 	lambda.Start(fraudRetryHandler.ProcessDLQFraudEvent)
