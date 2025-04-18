@@ -7,7 +7,7 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
-	"github.com/aws/aws-lambda-go/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
@@ -29,6 +29,9 @@ func main() {
 	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConf.Config), tableName)
 	repository := db.NewTransactionRepository(dbClient)
 
+	service := services.NewTransactionService(repository)
+	handler := handlers.NewTransactionProcessingHandler(service)
+
 	// Initialize OpenTelemetry
 	tp, err := xrayconfig.NewTracerProvider(ctx)
 	if err != nil {
@@ -45,13 +48,6 @@ func main() {
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(xray.Propagator{})
 
-	handlerWithRepo := func(ctx context.Context, event events.SQSEvent) {
-		tpErr := handlers.TransactionProcessingHandler(ctx, event, repository)
-		if tpErr != nil {
-			fmt.Printf("Error initializing transaction processing handler:\n%s", tpErr)
-		}
-	}
-
 	// Start Lambda with OpenTelemetry instrumentation
-	lambda.Start(otellambda.InstrumentHandler(handlerWithRepo, xrayconfig.WithRecommendedOptions(tp)...))
+	lambda.Start(otellambda.InstrumentHandler(handler.TransactionProcessingHandler, xrayconfig.WithRecommendedOptions(tp)...))
 }

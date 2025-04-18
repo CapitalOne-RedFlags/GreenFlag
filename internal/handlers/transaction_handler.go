@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/observability"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
@@ -13,7 +13,20 @@ import (
 	"github.com/aws/aws-xray-sdk-go/xray"
 )
 
-func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, repository db.TransactionRepository) error {
+type TransactionProcessingHandler struct {
+	service services.TransactionService
+}
+
+func NewTransactionProcessingHandler(service services.TransactionService) *TransactionProcessingHandler {
+	return &TransactionProcessingHandler{
+		service: service,
+	}
+}
+
+func (tph *TransactionProcessingHandler) TransactionProcessingHandler(ctx context.Context, event events.SQSEvent) (*models.BatchResult, error) {
+	var errorResults []error
+	var failedRIDs []string
+
 	// Create a new segment for the entire handler
 	ctx, seg := xray.BeginSegment(ctx, "TransactionProcessingHandler")
 	defer seg.Close(nil)
@@ -21,28 +34,37 @@ func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, re
 	// Add metadata about the SQS event
 	observability.SafeAddMetadata(seg, observability.KeyEventRecordsCount, len(event.Records))
 
-	// Create a subsegment for unmarshaling SQS messages
 	var transactions []models.Transaction
+	messageIdsByTransactionId := make(map[string]string)
+
+	// Create a subsegment for unmarshaling SQS messages
 	ctx, subSeg := xray.BeginSubsegment(ctx, "UnmarshalSQSMessages")
+
 	for i, record := range event.Records {
 		// Add annotation for each record
 		observability.SafeAddAnnotation(ctx, "MessageID-"+strconv.Itoa(i), record.MessageId)
 
-		result, err := models.UnmarshalSQS(record.Body)
+		transaction, err := models.UnmarshalSQS(record.Body)
 		if err != nil {
 			fmt.Printf("error Unmarshalling: %s", err)
+			errorResults = append(errorResults, err)
+			failedRIDs = append(failedRIDs, record.MessageId)
+
 			observability.SafeAddError(subSeg, err)
 			subSeg.Close(err)
-			return err
+
+			continue
 		}
-		transactions = append(transactions, *result)
+
+		transactions = append(transactions, *transaction)
+		messageIdsByTransactionId[transaction.TransactionID] = record.MessageId
 
 		// Add transaction metadata to the subsegment
 		observability.SafeAddMetadata(subSeg, observability.KeyTransaction+strconv.Itoa(i), map[string]interface{}{
-			"TransactionID": result.TransactionID,
-			"AccountID":     result.AccountID,
-			"Amount":        result.TransactionAmount,
-			"Email":         result.Email,
+			"TransactionID": transaction.TransactionID,
+			"AccountID":     transaction.AccountID,
+			"Amount":        transaction.TransactionAmount,
+			"Email":         transaction.Email,
 		})
 	}
 	subSeg.Close(nil)
@@ -64,11 +86,20 @@ func TransactionProcessingHandler(ctx context.Context, event events.SQSEvent, re
 	observability.SafeAddMetadata(txnSeg, observability.KeyEmails, emails)
 
 	// Pass the X-Ray context to the service layer
-	err := services.TransactionService(ctx, transactions, repository)
+	failedTransactions, err := tph.service.TransactionService(ctx, transactions)
 	if err != nil {
+		errorResults = append(errorResults, err)
 		observability.SafeAddError(txnSeg, err)
 	}
+
 	txnSeg.Close(err)
 
-	return err
+	batchResultInput := &middleware.GetBatchResultInput{
+		FailedTransactions:  failedTransactions,
+		RIDsByTransactionId: messageIdsByTransactionId,
+		FailedRIDs:          failedRIDs,
+		Errors:              errorResults,
+	}
+
+	return middleware.GetBatchResult(batchResultInput)
 }

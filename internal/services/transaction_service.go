@@ -10,21 +10,49 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
 
-func TransactionService(ctx context.Context, transactions []models.Transaction, repository db.TransactionRepository) error {
+type TransactionService interface {
+	TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error)
+}
+
+type GfTransactionService struct {
+	repository db.TransactionRepository
+}
+
+func NewTransactionService(repository db.TransactionRepository) *GfTransactionService {
+	return &GfTransactionService{
+		repository: repository,
+	}
+}
+
+func (ts *GfTransactionService) TransactionService(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
+	failedTransactions := make(chan models.Transaction, len(transactions))
+
 	for _, record := range transactions {
 		wg.Add(1)
-		go func(result models.Transaction) {
+		go func(txn models.Transaction) {
 			defer wg.Done()
-			_, _, err := repository.SaveTransaction(ctx, &result)
+			_, _, err := ts.repository.SaveTransaction(ctx, &txn)
 			if err != nil {
 				fmt.Printf("error savign transaction: %s", err)
 				errorResults <- err
+				failedTransactions <- txn
 			}
 		}(record)
 	}
 	wg.Wait()
+
 	close(errorResults)
-	return middleware.MergeErrors(errorResults)
+	close(failedTransactions)
+
+	return channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
+}
+
+func channelToSlice[T any](ch <-chan T) []T {
+	var result []T
+	for val := range ch {
+		result = append(result, val)
+	}
+	return result
 }

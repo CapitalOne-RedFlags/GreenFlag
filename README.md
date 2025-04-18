@@ -19,6 +19,7 @@ project-root/
 │   └── lambda/
 │       └── fraud/fraud_pipeline.go  # Entry point for Lambda function
 │       └── response/response_pipeline.go
+│       └── retry/fraud_retry_pipeline.go
 │       └── transactions/transaction_pipeline.go
 ├── internal/
 │   ├── config/
@@ -45,6 +46,7 @@ project-root/
 │   │   ├── transaction_handler.go  # Handles Lambda triggers for transactions
 │   │   ├── fraud_handler.go  # Processes fraud-related events
 │   │   ├── response_handler.go  # Handles user Yes/No responses from SNS
+│   │   ├── fraud_retry_handler.go  # Retries failed fraud-related events
 │   ├── logging/
 │   │   └── logger.go  # Implements structured logging
 │   ├── middleware/

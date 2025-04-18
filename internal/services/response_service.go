@@ -103,10 +103,3 @@ func (rs *GfResponseService) RsUpdateTransaction(ctx context.Context, messages [
 
 	return channelToSlice(failedMessages), middleware.MergeErrors(errorResults)
 }
-func channelToSlice[T any](ch <-chan T) []T {
-	var result []T
-	for val := range ch {
-		result = append(result, val)
-	}
-	return result
-}

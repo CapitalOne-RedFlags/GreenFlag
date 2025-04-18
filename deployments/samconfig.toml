@@ -9,6 +9,7 @@ capabilities = "CAPABILITY_IAM"
 
 parameter_overrides = [
   "TransactionQueueARN=arn:aws:sqs:us-east-1:140023383737:Bank_Transactions",
+  "TransactionDLQARN=arn:aws:sqs:us-east-1:140023383737:TransactionDLQ",
   "DynamoDBTableName=Transactions",
   "AWSRegion=us-east-1",
   "ResponseQueueArn=arn:aws:sqs:us-east-1:140023383737:ResponseQueue"
@@ -22,6 +23,7 @@ region = "us-east-1"
 profile = "AdministratorAccess-140023383737"
 parameter_overrides = [
   "TransactionQueueARN=arn:aws:sqs:us-east-1:140023383737:Bank_Transactions",
+  "TransactionDLQARN=arn:aws:sqs:us-east-1:140023383737:TransactionDLQ",
   "DynamoDBTableName=Transactions",
   "AWSRegion=us-east-1",
   "ResponseQueueArn=arn:aws:sqs:us-east-1:140023383737:ResponseQueue"
