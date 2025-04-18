@@ -7,11 +7,14 @@ import (
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/fraud_detection"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/messaging"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/lambda"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/frauddetector"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig"
@@ -24,22 +27,28 @@ func main() {
 
 	context := context.Background()
 
-	awsConfig, err := config.LoadAWSConfig(context)
+	// Load AWS configuration
+	awsConfig, err := awsconfig.LoadDefaultConfig(context)
 	if err != nil {
 		log.Fatalf("Failed to load AWS configuration: %s\n", err)
 	}
-	tableName := config.DBConfig.TableName
-	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConfig.Config), tableName)
-	repository := db.NewTransactionRepository(dbClient)
-	snsClient := sns.NewFromConfig(awsConfig.Config)
 
+	// Initialize AWS clients
+	tableName := config.DBConfig.TableName
+	dbClient := db.NewDynamoDBClient(dynamodb.NewFromConfig(awsConfig), tableName)
+	repository := db.NewTransactionRepository(dbClient)
+	snsClient := sns.NewFromConfig(awsConfig)
+	fraudDetectorClient := frauddetector.NewFromConfig(awsConfig)
+
+	// Create SNS topic
 	topicName := config.SNSMessengerConfig.TopicName
 	twilioUsername := config.SNSMessengerConfig.TwilioUsername
-	twiilioPassword := config.SNSMessengerConfig.TwilioPassword
+	twilioPassword := config.SNSMessengerConfig.TwilioPassword
 	topicArn, err := messaging.CreateTopic(snsClient, topicName)
 	if err != nil {
 		log.Fatalf("Failed to create SNS topic: %s\n", err)
 	}
+
 	// Initialize OpenTelemetry
 	tp, err := xrayconfig.NewTracerProvider(context)
 	if err != nil {
@@ -56,13 +65,13 @@ func main() {
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(xray.Propagator{})
 
-	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twiilioPassword)
+	// Initialize services
+	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twilioPassword)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
-	fraudService, err := services.NewAWSFraudService(eventDispatcher, repository)
-	if err != nil {
-		log.Fatalf("Failed to initialize AWS Fraud Detector service: %s\n", err)
-	}
+	fraudDetector := fraud_detection.NewGfAWSFraudDetector(fraudDetectorClient)
+	fraudService := services.NewAWSFraudService(eventDispatcher, repository, fraudDetector)
 	fraudHandler := handlers.NewFraudHandler(fraudService)
 
+	// Start Lambda with OpenTelemetry instrumentation
 	lambda.Start(otellambda.InstrumentHandler(fraudHandler.ProcessFraudEvent, xrayconfig.WithRecommendedOptions(tp)...))
 }
