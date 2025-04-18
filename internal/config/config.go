@@ -73,6 +73,10 @@ var SQSConfig = &struct {
 	QueueURL string
 }{}
 
+var HandlerConfig = &struct {
+	IsRetry bool
+}{}
+
 // AWSConfig stores AWS-specific configurations
 type AWSConfig struct {
 	Region      string
@@ -164,6 +168,9 @@ func InitializeConfig() {
 		SNSMessengerConfig.TwilioUsername = secrets.Username
 		SNSMessengerConfig.TwilioPassword = secrets.Password
 	}
+
+	// Initialize handler config
+	HandlerConfig.IsRetry = GetEnv("IS_RETRY", "false") == "true"
 
 	log.Printf("DynamoDB Table: %s", DBConfig.TableName)
 	log.Printf("DynamoDB Endpoint: %s", DBConfig.DynamoDBEndpoint)

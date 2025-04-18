@@ -17,6 +17,10 @@ Parameters:
     Type: String
     Description: ARN of the SQS queue holding transaction messages
 
+  TransactionDLQARN:
+    Type: String
+    Description: ARN of the SQS dead letter queue holding transaction messages
+
   ResponseQueueArn:
     Type: String
     Description: ARN of the SQS queue holding response messages
@@ -162,6 +166,8 @@ Resources:
             Queue: !Ref TransactionQueueARN
             BatchSize: 10
             MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
     Metadata:
       BuildMethod: makefile
 
@@ -175,6 +181,21 @@ Resources:
       CodeUri: ../
       Handler: bootstrap
       Runtime: provided.al2
+      
+      Events:
+        DynamoDBStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt TransactionsTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+            MaximumRetryAttempts: 2
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt FraudDLQ.Arn
       Environment:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
@@ -237,21 +258,18 @@ Resources:
               Resource: !Ref NotificationTopic
             - Effect: Allow
               Action:
+                - sqs:SendMessage
+              Resource: !GetAtt FraudDLQ.Arn
+            - Effect: Allow
+              Action:
                 - secretsmanager:GetSecretValue
               Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
-      Events:
-        DynamoDBStream:
-          Type: DynamoDB
-          Properties:
-            Stream: !GetAtt TransactionsTable.StreamArn
-            StartingPosition: TRIM_HORIZON
-            BatchSize: 10
-            MaximumBatchingWindowInSeconds: 5
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-collector-amd64-ver-0-115-0:3"
       Tracing: Active
     Metadata:
       BuildMethod: makefile
+
   # ########################################
   # # (5) SQS Queue and ResponsePipelineFunction
   # ########################################
@@ -309,8 +327,120 @@ Resources:
             MaximumBatchingWindowInSeconds: 5
     Metadata:
       BuildMethod: makefile
-  
 
+  ########################################
+  # (6) Fraud Pipeline Dead Letter Queue
+  ########################################
+  FraudDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FraudDLQ
+
+  ########################################
+  # (7) Response Pipeline Dead Letter Queue
+  ########################################
+  ResponseDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ResponseDLQ
+
+  ########################################
+  # (8) TransactionPipelineRetryFunction
+  ########################################
+  TransactionPipelineRetryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TransactionPipelineRetryFunction
+      CodeUri: ../
+      Handler: bootstrap
+      Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+          IS_RETRY: true
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource: !Ref TransactionDLQARN
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref TransactionDLQARN
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+    Metadata:
+      BuildMethod: makefile
+
+  ########################################
+  # (9) FraudPipelineRetryFunction
+  ########################################
+  FraudPipelineRetryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FraudPipelineRetryFunction
+      CodeUri: ../
+      Handler: bootstrap
+      Runtime: provided.al2
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+          IS_RETRY: true
+
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:DescribeTable
+              Resource: !GetAtt TransactionsTable.Arn
+            - Effect: Allow
+              Action:
+                - sns:CreateTopic
+                - sns:Subscribe
+                - sns:Publish
+              Resource: !Ref NotificationTopic
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt FraudDLQ.Arn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: arn:aws:secretsmanager:us-east-1:140023383737:secret:greenflags/twilio-*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FraudDLQ.Arn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+    Metadata:
+      BuildMethod: makefile
 
 Outputs:
   DynamoDBTableNameOut:
@@ -328,7 +458,15 @@ Outputs:
   FraudPipelineArn:
     Description: "ARN of the FraudPipelineFunction"
     Value: !GetAtt FraudPipelineFunction.Arn
-
+  
   ResponsePipelineArn:
     Description: "ARN of the ResponsePipelineFunction"
     Value: !GetAtt ResponsePipelineFunction.Arn
+
+  TransactionRetryArn:
+    Description: "ARN of the TransactionPipelineRetryFunction"
+    Value: !GetAtt TransactionPipelineRetryFunction.Arn
+
+  FraudRetryArn:
+    Description: "ARN of the FraudPipelineRetryFunction"
+    Value: !GetAtt FraudPipelineRetryFunction.Arn

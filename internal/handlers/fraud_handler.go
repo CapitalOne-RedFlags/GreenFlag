@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/observability"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-xray-sdk-go/xray"
 )
 
@@ -27,7 +26,10 @@ func NewFraudHandler(fraudService services.FraudService) *GfFraudHandler {
 	}
 }
 
-func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.DynamoDBEvent) error {
+func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.DynamoDBEvent) (*models.BatchResult, error) {
+	var errorResults []error
+	var failedRIDs []string
+
 	// Create a segment for the fraud handler
 	ctx, seg := xray.BeginSegment(ctx, "FraudHandler")
 	defer seg.Close(nil)
@@ -39,6 +41,7 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	ctx, procSeg := xray.BeginSubsegment(ctx, "ProcessDynamoDBRecords")
 
 	var transactions []models.Transaction
+	ridsByTransactionId := make(map[string]string)
 	var transactionIDs []string
 
 	for i, record := range event.Records {
@@ -49,20 +52,30 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 			continue
 		}
 
-		attributeValueMap := make(map[string]types.AttributeValue)
-		for attr, dynamoAttributeValue := range record.Change.NewImage {
-			attributeValueMap[attr] = convertDynamoDBAttributeValue(dynamoAttributeValue)
-		}
-
-		transaction, err := models.UnmarshalDynamoDB(attributeValueMap)
+		transaction, err := models.UnmarshalStreamImage(record.Change.NewImage)
 		if err != nil {
+			errorResults = append(errorResults, err)
+			failedRIDs = append(failedRIDs, record.Change.SequenceNumber)
+
 			observability.SafeAddError(procSeg, err)
 			procSeg.Close(err)
-			return err
+
+			continue
+		}
+
+		if err := transaction.ValidateTransaction(); err != nil {
+			errorResults = append(errorResults, err)
+			failedRIDs = append(failedRIDs, record.Change.SequenceNumber)
+
+			observability.SafeAddError(procSeg, err)
+			procSeg.Close(err)
+
+			continue
 		}
 
 		transactions = append(transactions, *transaction)
 		transactionIDs = append(transactionIDs, transaction.TransactionID)
+		ridsByTransactionId[transaction.TransactionID] = record.Change.SequenceNumber
 	}
 
 	// Add transaction IDs to metadata
@@ -80,7 +93,7 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	observability.SafeAddMetadata(fraudSeg, observability.KeyEmailsChecked, emailsChecked)
 
 	// Call the fraud service
-	fraudulentTransactions, err := fh.FraudService.PredictFraud(ctx, transactions)
+	fraudulentTransactions, failedTransactions, err := fh.FraudService.PredictFraud(ctx, transactions)
 
 	// Add metadata about fraudulent transactions
 	if len(fraudulentTransactions) > 0 {
@@ -105,46 +118,18 @@ func (fh *GfFraudHandler) ProcessFraudEvent(ctx context.Context, event events.Dy
 	}
 
 	if err != nil {
+		errorResults = append(errorResults, err)
 		observability.SafeAddError(fraudSeg, err)
 	}
 
 	fraudSeg.Close(err)
-	return err
-}
 
-// Converts AWS Lambda event DynamoDBAttributeValue to AWS SDK v2 AttributeValue
-func convertDynamoDBAttributeValue(attr events.DynamoDBAttributeValue) types.AttributeValue {
-	switch attr.DataType() {
-	case events.DataTypeString:
-		return &types.AttributeValueMemberS{Value: attr.String()}
-	case events.DataTypeNumber:
-		return &types.AttributeValueMemberN{Value: attr.Number()}
-	case events.DataTypeBoolean:
-		return &types.AttributeValueMemberBOOL{Value: attr.Boolean()}
-	case events.DataTypeBinary:
-		return &types.AttributeValueMemberB{Value: attr.Binary()}
-	case events.DataTypeNull:
-		return &types.AttributeValueMemberNULL{Value: attr.IsNull()}
-	case events.DataTypeStringSet:
-		return &types.AttributeValueMemberSS{Value: attr.StringSet()}
-	case events.DataTypeNumberSet:
-		return &types.AttributeValueMemberNS{Value: attr.NumberSet()}
-	case events.DataTypeBinarySet:
-		return &types.AttributeValueMemberBS{Value: attr.BinarySet()}
-	case events.DataTypeMap:
-		mapped := make(map[string]types.AttributeValue)
-		for k, v := range attr.Map() {
-			mapped[k] = convertDynamoDBAttributeValue(v)
-		}
-		return &types.AttributeValueMemberM{Value: mapped}
-	case events.DataTypeList:
-		var list []types.AttributeValue
-		for _, v := range attr.List() {
-			list = append(list, convertDynamoDBAttributeValue(v))
-		}
-		return &types.AttributeValueMemberL{Value: list}
-	default:
-		fmt.Printf("Unsupported attribute type: %v\n", attr.DataType())
-		return nil
+	batchResultInput := &middleware.GetBatchResultInput{
+		FailedTransactions:  failedTransactions,
+		RIDsByTransactionId: ridsByTransactionId,
+		FailedRIDs:          failedRIDs,
+		Errors:              errorResults,
 	}
+
+	return middleware.GetBatchResult(batchResultInput)
 }
