@@ -26,10 +26,11 @@ func NewAWSFraudService(dispatcher events.EventDispatcher, repo db.TransactionRe
 	}
 }
 
-func (fs *AWSFraudService) PredictFraud(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, error) {
+func (fs *AWSFraudService) PredictFraud(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, []models.Transaction, error) {
 	var wg sync.WaitGroup
 	errorResults := make(chan error, len(transactions))
 	fraudResults := make(chan models.Transaction, len(transactions))
+	approvedResults := make(chan models.Transaction, len(transactions))
 
 	for _, txn := range transactions {
 		wg.Add(1)
@@ -55,6 +56,7 @@ func (fs *AWSFraudService) PredictFraud(ctx context.Context, transactions []mode
 			} else {
 				// Mark as approved
 				txn.TransactionStatus = "APPROVED"
+				approvedResults <- txn
 			}
 
 			// Update transaction in database
@@ -69,6 +71,7 @@ func (fs *AWSFraudService) PredictFraud(ctx context.Context, transactions []mode
 	wg.Wait()
 	close(errorResults)
 	close(fraudResults)
+	close(approvedResults)
 
 	// Collect fraud transactions
 	var fraudulentTransactions []models.Transaction
@@ -76,5 +79,11 @@ func (fs *AWSFraudService) PredictFraud(ctx context.Context, transactions []mode
 		fraudulentTransactions = append(fraudulentTransactions, txn)
 	}
 
-	return fraudulentTransactions, middleware.MergeErrors(errorResults)
+	// Collect approved transactions
+	var approvedTransactions []models.Transaction
+	for txn := range approvedResults {
+		approvedTransactions = append(approvedTransactions, txn)
+	}
+
+	return fraudulentTransactions, approvedTransactions, middleware.MergeErrors(errorResults)
 }
