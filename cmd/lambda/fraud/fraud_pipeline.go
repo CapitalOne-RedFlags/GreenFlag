@@ -58,7 +58,10 @@ func main() {
 
 	snsMessenger := messaging.NewGfSNSMessenger(snsClient, topicName, topicArn, twilioUsername, twiilioPassword)
 	eventDispatcher := events.NewGfEventDispatcher(snsMessenger)
-	fraudService := services.NewFraudService(eventDispatcher, repository)
+	fraudService, err := services.NewAWSFraudService(eventDispatcher, repository)
+	if err != nil {
+		log.Fatalf("Failed to initialize AWS Fraud Detector service: %s\n", err)
+	}
 	fraudHandler := handlers.NewFraudHandler(fraudService)
 
 	lambda.Start(otellambda.InstrumentHandler(fraudHandler.ProcessFraudEvent, xrayconfig.WithRecommendedOptions(tp)...))
