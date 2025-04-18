@@ -59,7 +59,7 @@ func (fd *GfAWSFraudDetector) PredictFraud(ctx context.Context, txn models.Trans
 	}
 
 	// Process the prediction result
-	if result.ModelScores != nil && len(result.ModelScores) > 0 {
+	if len(result.ModelScores) > 0 {
 		for _, score := range result.ModelScores {
 			if fraudScore, exists := score.Scores["fraud_score"]; exists && fraudScore > 0.5 {
 				return true, nil
