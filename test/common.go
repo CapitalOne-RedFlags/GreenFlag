@@ -10,26 +10,29 @@ import (
 )
 
 func GetTestTransaction(email string) models.Transaction {
+	now := time.Now()
+	eventID := uuid.New().String()
+
 	return models.Transaction{
-		TransactionID:           uuid.New().String(),
-		AccountID:               "TEST-" + uuid.New().String(),
-		TransactionAmount:       100.50,
-		TransactionDate:         time.Now().Format(time.RFC3339),
-		TransactionType:         "PURCHASE",
-		Location:                "New York",
-		DeviceID:                "device-123",
-		IPAddress:               "192.168.1.1",
-		MerchantID:              "merchant-456",
-		Channel:                 "WEB",
-		CustomerAge:             30,
-		CustomerOccupation:      "Engineer",
-		TransactionDuration:     120,
-		LoginAttempts:           1,
-		AccountBalance:          5000.00,
-		PreviousTransactionDate: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		PhoneNumber:             "+12025550179",
-		Email:                   email,
-		TransactionStatus:       "PENDING",
+		TransactionID:       uuid.New().String(),
+		AccountID:           "TEST-" + uuid.New().String(),
+		TransactionAmount:   100.50,
+		TransactionDate:     now.Format(time.RFC3339),
+		TransactionType:     "PURCHASE",
+		EventID:             eventID,
+		EventLabel:          "TRANSACTION",
+		EventTimestamp:      now.Format(time.RFC3339),
+		LabelTimestamp:      now.Format(time.RFC3339),
+		EntityID:            "ENTITY-" + uuid.New().String(),
+		EntityType:          "CUSTOMER",
+		Location:            "New York",
+		IPAddress:           "192.168.1.1",
+		TransactionDuration: 120,
+		AccountBalance:      5000.00,
+		PhoneNumber:         "+12025550179",
+		Email:               email,
+		EmailAddress:        email,
+		TransactionStatus:   "PENDING",
 	}
 }
 
