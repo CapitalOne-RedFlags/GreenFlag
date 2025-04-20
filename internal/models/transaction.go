@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/config"
@@ -16,25 +18,32 @@ import (
 
 // Transaction represents a record in DynamoDB.
 type Transaction struct {
-	TransactionID           string  `json:"transactionId" dynamodbav:"TransactionID" validate:"required"`
-	AccountID               string  `json:"accountId" dynamodbav:"AccountID" validate:"required"`
-	TransactionAmount       float64 `json:"amount" dynamodbav:"TransactionAmount" validate:"gte=0"`
-	TransactionDate         string  `json:"transactionDate" dynamodbav:"TransactionDate"`
-	TransactionType         string  `json:"transactionType" dynamodbav:"TransactionType"`
+	TransactionID           string  `json:"transaction_id" dynamodbav:"TransactionID" validate:"required"`
+	AccountID               string  `json:"account_id" dynamodbav:"AccountID" validate:"required"`
+	TransactionAmount       float64 `json:"transaction_amount" dynamodbav:"TransactionAmount" validate:"gte=0"`
+	TransactionDate         string  `json:"transaction_date" dynamodbav:"TransactionDate" validate:"required"`
+	TransactionType         string  `json:"transaction_type" dynamodbav:"TransactionType" validate:"required"`
 	Location                string  `json:"location" dynamodbav:"Location"`
 	DeviceID                string  `json:"deviceId" dynamodbav:"DeviceID"`
-	IPAddress               string  `json:"ipAddress" dynamodbav:"IPAddress"`
+	IPAddress               string  `json:"ip_address" dynamodbav:"IPAddress" validate:"omitempty,ip"`
 	MerchantID              string  `json:"merchantId" dynamodbav:"MerchantID"`
 	Channel                 string  `json:"channel" dynamodbav:"Channel"`
 	CustomerAge             int     `json:"customerAge" dynamodbav:"CustomerAge" validate:"gte=18"`
 	CustomerOccupation      string  `json:"customerOccupation" dynamodbav:"CustomerOccupation"`
-	TransactionDuration     int     `json:"transactionDuration" dynamodbav:"TransactionDuration"`
+	TransactionDuration     int     `json:"transaction_duration" dynamodbav:"TransactionDuration" validate:"gte=0"`
 	LoginAttempts           int     `json:"loginAttempts" dynamodbav:"LoginAttempts"`
-	AccountBalance          float64 `json:"accountBalance" dynamodbav:"AccountBalance"`
+	AccountBalance          float64 `json:"account_balance" dynamodbav:"AccountBalance" validate:"gte=0"`
 	PreviousTransactionDate string  `json:"previousTransactionDate" dynamodbav:"PreviousTransactionDate"`
-	PhoneNumber             string  `json:"phoneNumber" dynamodbav:"PhoneNumber" validate:"required,e164"`
+	PhoneNumber             string  `json:"phone_number" dynamodbav:"PhoneNumber" validate:"required,e164"`
 	Email                   string  `json:"email" dynamodbav:"Email" validate:"required,email"`
-	TransactionStatus       string  `json:"transactionStatus" dynamodbav:"TransactionStatus"`
+	TransactionStatus       string  `json:"transaction_status" dynamodbav:"TransactionStatus" validate:"required,oneof=PENDING COMPLETED FAILED FRAUD_DETECTED"`
+	EventID                 string  `json:"event_id" dynamodbav:"EventID" validate:"required"`
+	EventLabel              string  `json:"event_label" dynamodbav:"EventLabel"`
+	EventTimestamp          string  `json:"event_timestamp" dynamodbav:"EventTimestamp" validate:"required"`
+	LabelTimestamp          string  `json:"label_timestamp" dynamodbav:"LabelTimestamp"`
+	EntityID                string  `json:"entity_id" dynamodbav:"EntityID"`
+	EntityType              string  `json:"entity_type" dynamodbav:"EntityType"`
+	EmailAddress            string  `json:"email_address" dynamodbav:"EmailAddress" validate:"required,email"`
 }
 
 // MarshalDynamoDB marshals a Transaction into a DynamoDB attribute map.
@@ -234,4 +243,59 @@ func convertDynamoDBAttributeValue(attr events.DynamoDBAttributeValue) types.Att
 		fmt.Printf("Unsupported attribute type: %v\n", attr.DataType())
 		return nil
 	}
+}
+
+func parseTransaction(record []string, colMap map[string]int) (Transaction, error) {
+	// Parse numeric fields
+	transactionDuration, _ := strconv.Atoi(record[colMap["transaction_duration"]])
+	accountBalance, _ := strconv.ParseFloat(record[colMap["account_balance"]], 64)
+	transactionAmount, _ := strconv.ParseFloat(record[colMap["transaction_amount"]], 64)
+
+	// Format phone number - add "+" prefix if not present
+	phoneNumber := record[colMap["phone_number"]]
+	if phoneNumber != "" && !strings.HasPrefix(phoneNumber, "+") {
+		phoneNumber = "+" + phoneNumber
+	}
+
+	// Create transaction with new fields
+	transaction := Transaction{
+		// Primary Keys
+		TransactionID: record[colMap["transaction_id"]],
+		AccountID:     record[colMap["account_id"]],
+
+		// Transaction Details
+		TransactionAmount: transactionAmount,
+		TransactionDate:   record[colMap["transaction_date"]],
+		TransactionType:   record[colMap["transaction_type"]],
+
+		// Event Information
+		EventID:        record[colMap["EVENT_ID"]],
+		EventLabel:     record[colMap["EVENT_LABEL"]],
+		EventTimestamp: record[colMap["EVENT_TIMESTAMP"]],
+		LabelTimestamp: record[colMap["LABEL_TIMESTAMP"]],
+
+		// Entity Information
+		EntityID:   record[colMap["ENTITY_ID"]],
+		EntityType: record[colMap["ENTITY_TYPE"]],
+
+		// Location and Network Info
+		Location:  record[colMap["location"]],
+		IPAddress: record[colMap["ip_address"]],
+
+		// Transaction Metadata
+		TransactionDuration: transactionDuration,
+
+		// Financial Information
+		AccountBalance: accountBalance,
+
+		// Contact Information
+		PhoneNumber:  phoneNumber,
+		Email:        record[colMap["email"]],
+		EmailAddress: record[colMap["email_address"]],
+
+		// Default status for new transactions
+		TransactionStatus: "PENDING",
+	}
+
+	return transaction, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
@@ -11,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -76,27 +78,71 @@ func (m *MockFraudService) PredictFraud(ctx context.Context, transactions []mode
 	return args.Get(0).([]models.Transaction), args.Get(1).([]models.Transaction), args.Error(2)
 }
 
+type MockFraudDetector struct {
+	mock.Mock
+}
+
+func (m *MockFraudDetector) PredictFraud(ctx context.Context, txn models.Transaction) (bool, error) {
+	args := m.Called(ctx, txn)
+	return args.Bool(0), args.Error(1)
+}
+
 type PredictFraudTestSuite struct {
 	suite.Suite
 	mockEventDispatcher       *MockEventDispatcher
 	mockFraudService          *MockFraudService
 	mockTransactionRepository *MockTransactionRepository
+	mockFraudDetector         *MockFraudDetector
 }
 
 func (suite *PredictFraudTestSuite) SetupTest() {
 	suite.mockEventDispatcher = new(MockEventDispatcher)
 	suite.mockFraudService = new(MockFraudService)
 	suite.mockTransactionRepository = new(MockTransactionRepository)
+	suite.mockFraudDetector = new(MockFraudDetector)
 }
 
 // Fraud Service Tests
 func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "safeuser@example.com", AccountID: "1", TransactionID: "1"},
-		{Email: "anotheruser@example.com", AccountID: "2", TransactionID: "2"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "safeuser@example.com",
+			EmailAddress:      "safeuser@example.com",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
+		{
+			TransactionID:     "2",
+			AccountID:         "2",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-2",
+			EntityType:        "CUSTOMER",
+			Email:             "anotheruser@example.com",
+			EmailAddress:      "anotheruser@example.com",
+			PhoneNumber:       "+12025550180",
+			TransactionStatus: "PENDING",
+		},
 	}
+
+	// Set up mock fraud detector expectations
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[0]).Return(false, nil).Once()
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[1]).Return(false, nil).Once()
+
 	suite.mockTransactionRepository.On(
 		"UpdateTransaction",
 		ctx,
@@ -114,7 +160,8 @@ func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 			return t.Email == "anotheruser@example.com" && t.TransactionStatus == "APPROVED"
 		}),
 	).Return(nil, nil).Once()
-	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
+
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository, suite.mockFraudDetector)
 
 	// Act
 	_, failedTransactions, err := fraudService.PredictFraud(ctx, transactions)
@@ -122,14 +169,33 @@ func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 	// Assert
 	assert.NoError(suite.T(), err, "Should not return an error for non-fraud transactions")
 	assert.Empty(suite.T(), failedTransactions)
+	suite.mockFraudDetector.AssertExpectations(suite.T())
 }
 
 func (suite *PredictFraudTestSuite) TestFraudDetected() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "rshart@wisc.edu", AccountID: "1", TransactionID: "1"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "rshart@wisc.edu",
+			EmailAddress:      "rshart@wisc.edu",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
 	}
+
+	// Set up mock fraud detector expectations
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[0]).Return(true, nil).Once()
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[0]).Return(nil).Once()
 
@@ -137,7 +203,7 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 		return t.AccountID == "1" && t.TransactionID == "1"
 	})).Return(nil, nil).Once()
 
-	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockEventDispatcher)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockEventDispatcher, suite.mockFraudDetector)
 
 	// Act
 	_, failedTransactions, err := fraudService.PredictFraud(ctx, transactions)
@@ -146,36 +212,102 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 	assert.NoError(suite.T(), err, "Should not return an error when fraud alert is successfully dispatched")
 	assert.Empty(suite.T(), failedTransactions)
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
+	suite.mockFraudDetector.AssertExpectations(suite.T())
 }
 
 func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "rshart@wisc.edu", AccountID: "1", TransactionID: "1"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "rshart@wisc.edu",
+			EmailAddress:      "rshart@wisc.edu",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
 	}
 
+	// Set up mock fraud detector expectations
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[0]).Return(true, nil).Once()
+
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[0]).Return(errors.New("dispatch error")).Once()
-	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository, suite.mockFraudDetector)
 
 	// Act
-
 	_, failedTransactions, err := fraudService.PredictFraud(ctx, transactions)
 
 	// Assert
 	assert.Error(suite.T(), err, "Should return an error when fraud alert dispatch fails")
 	assert.Len(suite.T(), failedTransactions, 1)
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
+	suite.mockFraudDetector.AssertExpectations(suite.T())
 }
 
 func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "jalarsen5@wisc.edu", AccountID: "1", TransactionID: "1"},
-		{Email: "rshart@wisc.edu", AccountID: "2", TransactionID: "2"},
-		{Email: "jpoconnell4@wisc.edu", AccountID: "3", TransactionID: "3"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "jalarsen5@wisc.edu",
+			EmailAddress:      "jalarsen5@wisc.edu",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
+		{
+			TransactionID:     "2",
+			AccountID:         "2",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-2",
+			EntityType:        "CUSTOMER",
+			Email:             "rshart@wisc.edu",
+			EmailAddress:      "rshart@wisc.edu",
+			PhoneNumber:       "+12025550180",
+			TransactionStatus: "PENDING",
+		},
+		{
+			TransactionID:     "3",
+			AccountID:         "3",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-3",
+			EntityType:        "CUSTOMER",
+			Email:             "jpoconnell4@wisc.edu",
+			EmailAddress:      "jpoconnell4@wisc.edu",
+			PhoneNumber:       "+12025550181",
+			TransactionStatus: "PENDING",
+		},
 	}
+
+	// Set up mock fraud detector expectations
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[0]).Return(false, nil).Once()
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[1]).Return(true, nil).Once()
+	suite.mockFraudDetector.On("PredictFraud", ctx, transactions[2]).Return(true, nil).Once()
+
 	suite.mockTransactionRepository.On(
 		"UpdateTransaction",
 		ctx,
@@ -205,7 +337,7 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[1]).Return(nil).Once()
 	suite.mockEventDispatcher.On("DispatchFraudAlertEvent", transactions[2]).Return(nil).Once()
-	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository)
+	fraudService := services.NewFraudService(suite.mockEventDispatcher, suite.mockTransactionRepository, suite.mockFraudDetector)
 
 	// Act
 	_, failedTransactions, err := fraudService.PredictFraud(ctx, transactions)
@@ -215,6 +347,7 @@ func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 	assert.Empty(suite.T(), failedTransactions)
 	suite.mockTransactionRepository.AssertExpectations(suite.T())
 	suite.mockEventDispatcher.AssertExpectations(suite.T())
+	suite.mockFraudDetector.AssertExpectations(suite.T())
 }
 
 // Fraud Detection Handler Tests

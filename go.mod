@@ -10,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.10
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.7.77
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.42.2
+	github.com/aws/aws-sdk-go-v2/service/frauddetector v1.36.2
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.3
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.38.1
 	github.com/aws/aws-xray-sdk-go v1.8.5
@@ -19,7 +20,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/twilio/twilio-go v1.25.1
 	go.opentelemetry.io/contrib/detectors/aws/ecs v1.35.0
-	go.opentelemetry.io/contrib/detectors/aws/lambda v0.60.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.60.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda/xrayconfig v0.60.0
 	go.opentelemetry.io/contrib/propagators/aws v1.35.0
@@ -56,6 +56,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.52.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/contrib/detectors/aws/lambda v0.60.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect

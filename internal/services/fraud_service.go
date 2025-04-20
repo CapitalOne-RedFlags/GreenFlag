@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"slices"
-
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/db"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/events"
+	"github.com/CapitalOne-RedFlags/GreenFlag/internal/fraud_detection"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/middleware"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
 )
@@ -20,13 +19,19 @@ type FraudService interface {
 type GfFraudService struct {
 	EventDispatcher events.EventDispatcher
 	TransactionRepo db.TransactionRepository
+	fraudDetector   fraud_detection.FraudDetector
 }
 
-func NewFraudService(dispatcher events.EventDispatcher, repo db.TransactionRepository) *GfFraudService {
+func NewFraudService(dispatcher events.EventDispatcher, repo db.TransactionRepository, detector fraud_detection.FraudDetector) *GfFraudService {
 	return &GfFraudService{
 		EventDispatcher: dispatcher,
 		TransactionRepo: repo,
+		fraudDetector:   detector,
 	}
+}
+
+func (fs *GfFraudService) predictFraud(ctx context.Context, transaction models.Transaction) (bool, error) {
+	return fs.fraudDetector.PredictFraud(ctx, transaction)
 }
 
 func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []models.Transaction) ([]models.Transaction, []models.Transaction, error) {
@@ -39,9 +44,18 @@ func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []model
 		wg.Add(1)
 		go func(txn models.Transaction) {
 			defer wg.Done()
-			isFraud, err := predictFraud(txn)
+
+			// Use the fraud detector to predict fraud
+			isFraud, err := fs.predictFraud(ctx, txn)
 			if err != nil {
-				errorResults <- err
+				wrappedErr := fmt.Errorf("fraud prediction failed for transaction %s (account: %s, amount: %.2f, merchant: %s, email: %s): %w",
+					txn.TransactionID,
+					txn.AccountID,
+					txn.TransactionAmount,
+					txn.MerchantID,
+					txn.Email,
+					err)
+				errorResults <- wrappedErr
 				failedTransactions <- txn
 				return
 			}
@@ -110,9 +124,4 @@ func (fs *GfFraudService) PredictFraud(ctx context.Context, transactions []model
 	close(fraudulentTransactions)
 
 	return channelToSlice(fraudulentTransactions), channelToSlice(failedTransactions), middleware.MergeErrors(errorResults)
-}
-
-// Placeholder for fraud prediction, to be replaced with prediction algorithm
-func predictFraud(transaction models.Transaction) (bool, error) {
-	return slices.Contains([]string{"rshart@wisc.edu", "jpoconnell4@wisc.edu", "c1redflagstest@gmail.com", "wlee298@wisc.edu", "donglaiduann@gmail.com"}, transaction.Email), nil
 }

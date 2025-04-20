@@ -134,11 +134,14 @@ func (s *TransactionRepositoryTestSuite) TearDownSuite() {
 
 // createValidTransaction creates a valid sample transaction for tests
 func (s *TransactionRepositoryTestSuite) createValidTransaction() models.Transaction {
+	now := time.Now()
+	eventID := uuid.New().String()
+
 	return models.Transaction{
 		TransactionID:           uuid.New().String(),
 		AccountID:               "TEST-" + uuid.New().String(),
 		TransactionAmount:       100.50,
-		TransactionDate:         time.Now().Format(time.RFC3339),
+		TransactionDate:         now.Format(time.RFC3339),
 		TransactionType:         "PURCHASE",
 		Location:                "New York",
 		DeviceID:                "device-123",
@@ -153,6 +156,13 @@ func (s *TransactionRepositoryTestSuite) createValidTransaction() models.Transac
 		PreviousTransactionDate: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
 		PhoneNumber:             "+12025550179",
 		Email:                   "test@example.com",
+		EventID:                 eventID,
+		EventLabel:              "TRANSACTION",
+		EventTimestamp:          now.Format(time.RFC3339),
+		LabelTimestamp:          now.Format(time.RFC3339),
+		EntityID:                "ENTITY-" + uuid.New().String(),
+		EntityType:              "CUSTOMER",
+		EmailAddress:            "test@example.com",
 		TransactionStatus:       "PENDING",
 	}
 }
