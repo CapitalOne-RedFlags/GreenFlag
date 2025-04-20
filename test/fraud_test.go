@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/handlers"
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/models"
@@ -11,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
 	"github.com/CapitalOne-RedFlags/GreenFlag/internal/services"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -103,10 +105,38 @@ func (suite *PredictFraudTestSuite) SetupTest() {
 // Fraud Service Tests
 func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "safeuser@example.com", AccountID: "1", TransactionID: "1"},
-		{Email: "anotheruser@example.com", AccountID: "2", TransactionID: "2"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "safeuser@example.com",
+			EmailAddress:      "safeuser@example.com",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
+		{
+			TransactionID:     "2",
+			AccountID:         "2",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-2",
+			EntityType:        "CUSTOMER",
+			Email:             "anotheruser@example.com",
+			EmailAddress:      "anotheruser@example.com",
+			PhoneNumber:       "+12025550180",
+			TransactionStatus: "PENDING",
+		},
 	}
 
 	// Set up mock fraud detector expectations
@@ -144,9 +174,24 @@ func (suite *PredictFraudTestSuite) TestNoFraudDetected() {
 
 func (suite *PredictFraudTestSuite) TestFraudDetected() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "rshart@wisc.edu", AccountID: "1", TransactionID: "1"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "rshart@wisc.edu",
+			EmailAddress:      "rshart@wisc.edu",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
 	}
 
 	// Set up mock fraud detector expectations
@@ -172,9 +217,24 @@ func (suite *PredictFraudTestSuite) TestFraudDetected() {
 
 func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "rshart@wisc.edu", AccountID: "1", TransactionID: "1"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "rshart@wisc.edu",
+			EmailAddress:      "rshart@wisc.edu",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
 	}
 
 	// Set up mock fraud detector expectations
@@ -195,11 +255,52 @@ func (suite *PredictFraudTestSuite) TestFraudDispatchFails() {
 
 func (suite *PredictFraudTestSuite) TestConcurrentTransactions() {
 	ctx := context.Background()
+	now := time.Now()
+
 	// Arrange
 	transactions := []models.Transaction{
-		{Email: "jalarsen5@wisc.edu", AccountID: "1", TransactionID: "1"},
-		{Email: "rshart@wisc.edu", AccountID: "2", TransactionID: "2"},
-		{Email: "jpoconnell4@wisc.edu", AccountID: "3", TransactionID: "3"},
+		{
+			TransactionID:     "1",
+			AccountID:         "1",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-1",
+			EntityType:        "CUSTOMER",
+			Email:             "jalarsen5@wisc.edu",
+			EmailAddress:      "jalarsen5@wisc.edu",
+			PhoneNumber:       "+12025550179",
+			TransactionStatus: "PENDING",
+		},
+		{
+			TransactionID:     "2",
+			AccountID:         "2",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-2",
+			EntityType:        "CUSTOMER",
+			Email:             "rshart@wisc.edu",
+			EmailAddress:      "rshart@wisc.edu",
+			PhoneNumber:       "+12025550180",
+			TransactionStatus: "PENDING",
+		},
+		{
+			TransactionID:     "3",
+			AccountID:         "3",
+			EventID:           uuid.New().String(),
+			EventLabel:        "TRANSACTION",
+			EventTimestamp:    now.Format(time.RFC3339),
+			LabelTimestamp:    now.Format(time.RFC3339),
+			EntityID:          "ENTITY-3",
+			EntityType:        "CUSTOMER",
+			Email:             "jpoconnell4@wisc.edu",
+			EmailAddress:      "jpoconnell4@wisc.edu",
+			PhoneNumber:       "+12025550181",
+			TransactionStatus: "PENDING",
+		},
 	}
 
 	// Set up mock fraud detector expectations
